@@ -36,6 +36,7 @@ if(NOT BUILD_PLAYERBOT_V2)
     ClassicBotMigrations.cpp
     ClassicGuildAskText.cpp
     ClassicBotLocale.cpp
+    ClassicBotLocaleLangs.cpp
     ClassicCompanionLeash.cpp
     ClassicMeleeReach.cpp
     ClassicFalseCombatEscape.cpp

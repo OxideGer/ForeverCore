@@ -1001,7 +1001,7 @@ public:
             if (!Lang::ParsePref(*word, pref))
             {
                 Lang::LocalizedHandler localized(handler);
-                localized.Get()->SendSysMessage("Usage: .bot language auto|en|ru");
+                localized.Get()->SendSysMessage("Usage: .bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw");
                 handler->SetSentErrorMessage(true);
                 return false;
             }
@@ -1009,8 +1009,8 @@ public:
         }
         // Taken after the change, so the answer is already in the language just chosen.
         Lang::LocalizedHandler localized(handler); handler = localized.Get();
-        bool const russian = Lang::LangOf(me) == Playerbot::Locale::Lang::Ru;
-        handler->PSendSysMessage("Bot replies: %s (%s). .bot language auto|en|ru changes it.", russian ? "Russian" : "English",
+        // The language by its own name ("Deutsch", "Français"): the same in every reader's language, so it needs no catalog entry.
+        handler->PSendSysMessage("Bot replies: %s (%s). .bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw changes it.", Playerbot::Locale::LangNativeName(Lang::LangOf(me)),
             Lang::GetPref(sess->GetAccountId()) == Lang::Pref::Auto ? "your client's language" : "your choice");
         return true;
     }
@@ -6023,17 +6023,26 @@ public:
         return true;
     }
 
-    // .playerbot langprobe <english line>
-    // The line as a Russian reader gets it from a bot (Util/BotLocaleText), or "unchanged" when no catalog entry matches: checks the
-    // catalog of the running build without a Russian client.
+    // .playerbot langprobe [<locale>] <english line>
+    // The line as a reader of that language gets it from a bot (Util/BotLocaleText; default ruRU), or "unchanged" when no catalog
+    // entry matches: checks the catalogs of the running build without a client of that language. The locale is taken only in its
+    // full form ("deDE", "zhTW"), so an English line that starts with "de" or "es" is not mistaken for one.
     static bool HandleLangProbe(ChatHandler* handler, Tail text)
     {
-        std::string const english(text);
-        std::string const russian = Playerbot::Locale::Translate(Playerbot::Locale::Lang::Ru, english);
-        if (russian == english)
-            handler->PSendSysMessage("langprobe: unchanged (%u Russian entries): %s", uint32(Playerbot::Locale::Russian().Size()), english.c_str());
+        namespace Loc = Playerbot::Locale;
+        std::string english(text);
+        Loc::Lang lang = Loc::Lang::Ru;
+        if (size_t const sp = english.find(' '); sp == 4)
+            if (Loc::Lang parsed; Loc::ParseLang(std::string_view(english).substr(0, 4), parsed) && parsed != Loc::Lang::En)
+            {
+                lang = parsed;
+                english.erase(0, 5);
+            }
+        std::string const out = Loc::Translate(lang, english);
+        if (out == english)
+            handler->PSendSysMessage("langprobe: unchanged (%u %s entries): %s", uint32(Loc::CatalogOf(lang).Size()), Loc::LangCode(lang), english.c_str());
         else
-            handler->PSendSysMessage("langprobe: ru: %s", russian.c_str());
+            handler->PSendSysMessage("langprobe: %s: %s", Loc::LangCode(lang), out.c_str());
         return true;
     }
 

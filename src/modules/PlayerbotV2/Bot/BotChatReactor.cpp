@@ -326,9 +326,10 @@ std::string BuildLocationReply(Player* bot, Player const* asker, uint32 sel, Pol
     if (auto const* ae = sAreaTableStore.LookupEntry(area_id))
     {
         area_name = ae->AreaName[sWorld->GetDefaultDbcLocale()];
-        if (asker && BotLanguage::LangOf(asker) == Locale::Lang::Ru)
-            if (char const* ru = ae->AreaName[LOCALE_ruRU]; ru && *ru)
-                area_name = ru;
+        // The zone's name in the asker's language when the server has that client data (any language, not only Russian).
+        if (asker)
+            if (char const* own = ae->AreaName[LocaleConstant(Locale::LocaleOf(BotLanguage::LangOf(asker)))]; own && *own)
+                area_name = own;
     }
     if (area_name.empty())
         area_name = "area " + std::to_string(area_id);
@@ -417,13 +418,14 @@ V2::ConversationContext MakeConvContext(Player* bot, BotAI* ai, Player* sender)
     ctx.level       = bot->GetLevel();
     // A Russian player is answered in Russian (GitHub #12: every whisper got English or "dunno"), with the zone's Russian
     // name when the server has the Russian client data.
-    ctx.russian = BotLanguage::LangOf(sender) == Locale::Lang::Ru;
+    Locale::Lang const reader = BotLanguage::LangOf(sender);
+    ctx.russian = reader == Locale::Lang::Ru;
+    ctx.lang = uint8(reader);
     if (auto const* ae = sAreaTableStore.LookupEntry(bot->GetAreaId()))
     {
         ctx.zone = ae->AreaName[sWorld->GetDefaultDbcLocale()];
-        if (ctx.russian)
-            if (char const* ru = ae->AreaName[LOCALE_ruRU]; ru && *ru)
-                ctx.zone = ru;
+        if (char const* own = ae->AreaName[LocaleConstant(Locale::LocaleOf(reader))]; own && *own)
+            ctx.zone = own;
     }
     ctx.duel = DuelAnswerFor(bot, sender);
     ctx.group = GroupAnswerFor(bot, sender);

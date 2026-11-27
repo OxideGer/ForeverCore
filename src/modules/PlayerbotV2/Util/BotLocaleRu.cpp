@@ -458,12 +458,12 @@ std::vector<Catalog::Entry> const& RussianEntries()
         { "I have nothing you could take from me.", "У меня нет заданий, которые вы могли бы взять." },
 
         // ---- .bot commands (cs_playerbot_v2) -------------------------------------------------------------------------------
-        { "Bot replies: {} ({}). .bot language auto|en|ru changes it.", "Ответы ботов: {} ({}). Изменить: .bot language auto|en|ru." },
+        { "Bot replies: {} ({}). .bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw changes it.", "Ответы ботов: {} ({}). Изменить: .bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw." },
         { "Russian", "русский" },
         { "English", "английский" },
         { "your client's language", "язык вашего клиента" },
         { "your choice", "ваш выбор" },
-        { "Usage: .bot language auto|en|ru", "Использование: .bot language auto|en|ru" },
+        { "Usage: .bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw", "Использование: .bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw" },
         { "WoW Forever Bots by Karrz, based on agatho's PlayerbotV2 (GPL-2.0). .bot add <class> [tank|healer|dps], .bot call, .bot dismiss; all orders: BOT_COMMANDS.md",
           "WoW Forever Bots от Karrz, на основе PlayerbotV2 от agatho (GPL-2.0). .bot add <класс> [tank|healer|dps], .bot call, .bot dismiss; все приказы: BOT_COMMANDS.md" },
         { "WoW Forever Bots. Usage: .bot add <class> [tank|healer|dps] [race] [male|female]  e.g. .bot add priest healer",

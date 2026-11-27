@@ -993,12 +993,21 @@ Playerbot.AddonHint.DelaySec = 30
 Playerbot.AddonHint.Url = "https://github.com/Karrz1/Karrz-playerbots-wow-forever/raw/main/addon/ForeverBots-addon.zip"
 
 #
-#  Playerbot.Language.Enable  (default 1, on) The bots answer each player in the language of that player's game client (Russian for
-#                             a ruRU client, English otherwise): whispers, party / raid chat, say, and the .bot command replies. A
-#                             line with no translation yet comes in English. A player can choose with .bot language auto|en|ru
-#                             (kept per account). 0: every reply in English, as before.
+#  Playerbot.Language.Enable  (default 1, on) The bots answer each player in the language of that player's game client (enUS,
+#                             deDE, esES, esMX, frFR, ruRU, koKR, ptBR, zhCN, zhTW; any other client reads English): whispers,
+#                             party / raid chat, say, channels, guild chat and the .bot command replies. Each reader gets their own
+#                             language, also in a group of mixed clients. A line with no translation yet comes in English (an esMX
+#                             reader first gets the esES line). A player can choose with
+#                             .bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw (kept per account). 0: every reply in English.
+#
+#  Playerbot.Localization.DefaultLocale
+#                             (default "auto") The language of lines no single reader decides: a bot's General / Trade post or
+#                             street talk through the external program when no real player is on the map. "auto" = the realm's
+#                             DBCLocale; or one of enUS deDE esES esMX frFR ruRU koKR ptBR zhCN zhTW. An unknown value is logged
+#                             and read as "auto"; it never stops the server.
 #
 Playerbot.Language.Enable = 1
+Playerbot.Localization.DefaultLocale = "auto"
 #   SoloFlee          a solo open-world bot (no group, not in an instance or battleground) losing a fight (HP under 30%,
 #                     35% for casters / hunters / rogues, 25% for melee; the mob not nearly dead) uses its escape tools
 #                     (Disengage, Frost Nova + Blink, Fade / Psychic Scream, Death Coil, Vanish / Sprint, Intimidating

@@ -73,6 +73,8 @@ struct ConversationContext
     ConvTone tone = ConvTone::Neutral;
     ConvLength length = ConvLength::Normal;
     bool russian = false;                  // the player reads Russian (BotLanguage::LangOf): the answer is written in Russian
+    uint8_t lang = 0;                      // the player's Locale::Lang; a language without its own pools here is answered in English,
+                                           // which the send point translates with that language's catalog
     DuelAnswer duel = DuelAnswer::NotNow;
     GroupAnswer group = GroupAnswer::Yes;  // in_group wins over it
 };

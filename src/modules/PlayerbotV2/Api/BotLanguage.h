@@ -2,7 +2,7 @@
 //
 // The text itself is translated by Util/BotLocaleText (the catalogs). This file decides the reader's language and sends:
 //
-//   * the player's choice, `.bot language auto|en|ru` (per account, kept in playerbot_v2_owner_language);
+//   * the player's choice, `.bot language auto|en|ru|de|fr|es|mx|pt|ko|cn|tw` (per account, kept in playerbot_v2_owner_language);
 //   * else the client's language: the session's locale when the realm loads that language (Load.Locales / DBC files), else the
 //     locale the client reported at login (auth `account.locale`, read once per login), so a Russian client on a realm with
 //     English data still gets Russian replies;
@@ -13,7 +13,8 @@
 // replies (LocalizedHandler).
 // Nothing is translated for a reader of English, so an English realm costs one lookup per line.
 //
-//   Playerbot.Language.Enable  1   0 = every bot reply in English (as before), whatever the client
+//   Playerbot.Language.Enable              1     0 = every bot reply in English (as before), whatever the client
+//   Playerbot.Localization.DefaultLocale   auto  the language of lines no single reader decides (ServerLang)
 //
 // World thread only (the send points run there; LangOf takes a shared lock, so it is safe elsewhere too).
 
@@ -35,13 +36,24 @@ class WorldSession;
 
 namespace Playerbot::BotLanguage {
 
-// A player's choice (stored as this number).
+// A player's choice (stored as this number in playerbot_v2_owner_language.language): 0 the client's language, else the
+// language number + 1 (en 1, ru 2 as before; de 3, fr 4, esES 5, esMX 6, ptBR 7, koKR 8, zhCN 9, zhTW 10).
 enum class Pref : uint8
 {
     Auto = 0,   // the client's language
     En   = 1,
     Ru   = 2,
+    // 3 .. 10: the other languages, PrefFor(Locale::Lang)
 };
+
+constexpr Pref PrefFor(Locale::Lang lang) { return Pref(uint8(lang) + 1); }
+// The language of a choice that is not Auto.
+constexpr Locale::Lang LangOfPref(Pref pref) { return Locale::Lang(uint8(pref) - 1); }
+constexpr bool IsValidPref(uint8 v) { return v <= uint8(Locale::kLangCount); }
+
+// The language for lines no one reader decides (a bot's General / Trade post through the external program when no player is
+// near, and the default of new bot names): Playerbot.Localization.DefaultLocale, "auto" = the realm's own (DBCLocale).
+Locale::Lang ServerLang();
 
 // Reads the config and the stored choices. World thread, at module init.
 void Load();

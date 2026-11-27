@@ -1,11 +1,18 @@
 #include "BotLocaleText.h"
 
 #include <algorithm>
+#include <random>
 #include <utility>
 
 namespace Playerbot::Locale {
 
 namespace {
+
+std::mt19937& VariantRng()
+{
+    thread_local std::mt19937 rng{ std::random_device{}() };
+    return rng;
+}
 
 constexpr int kMaxDepth = 3;   // a capture translated inside a capture inside a line, no deeper
 
@@ -94,7 +101,10 @@ bool CaptureFits(std::string_view cap, char kind)
 
 } // namespace
 
-bool Catalog::Add(std::string_view en, std::string_view tr)
+bool Catalog::Add(std::string_view en, std::string_view tr) { return AddImpl(en, tr, false); }
+bool Catalog::AddVariant(std::string_view en, std::string_view tr) { return AddImpl(en, tr, true); }
+
+bool Catalog::AddImpl(std::string_view en, std::string_view tr, bool variant)
 {
     auto reject = [&]() { rejected_.emplace_back(en); return false; };
     if (en.empty() || tr.empty()) return reject();
@@ -105,21 +115,32 @@ bool Catalog::Add(std::string_view en, std::string_view tr)
     if (slots < 0 || slots > int(lits.size()) - 1) return reject();
     if (lits.size() == 1)
     {
-        if (!exact_.emplace(std::string(en), std::string(tr)).second) return reject();
+        auto [it, added] = exact_.try_emplace(std::string(en));
+        if (!added && !variant) return reject();
+        if (!added && std::find(it->second.begin(), it->second.end(), tr) != it->second.end()) return reject();   // the same line twice
+        it->second.emplace_back(tr);
+        ++translations_;
         return true;
     }
     for (size_t i = 1; i + 1 < lits.size(); ++i)
         if (lits[i].empty() && kinds[i - 1] != '#') return reject();   // two captures in a row can only be told apart after a number
     size_t const fixed = Letters(lits);
     if (fixed == 0) return reject();
-    for (Pattern const& p : patterns_)
-        if (p.lits == lits && p.kinds == kinds) return reject();
+    for (Pattern& p : patterns_)
+        if (p.lits == lits && p.kinds == kinds)
+        {
+            if (!variant || std::find(p.trs.begin(), p.trs.end(), tr) != p.trs.end()) return reject();
+            p.trs.emplace_back(tr);
+            ++translations_;
+            return true;
+        }
     // Kept most specific first: most fixed letters, then most captures of a narrow kind (so "needs {} for {$}?" is tried before
     // "needs {} for {}?"), then table order. A lookup never sorts, and readers on several threads share it.
     size_t const typed = size_t(std::count_if(kinds.begin(), kinds.end(), [](char k) { return k != 'a' && k != '?'; }));
     auto const at = std::upper_bound(patterns_.begin(), patterns_.end(), std::make_pair(fixed, typed),
         [](std::pair<size_t, size_t> const& f, Pattern const& p) { return f.first != p.fixed ? f.first > p.fixed : f.second > p.typed; });
-    patterns_.insert(at, Pattern{ std::move(lits), std::move(kinds), std::string(tr), fixed, typed });
+    patterns_.insert(at, Pattern{ std::move(lits), std::move(kinds), { std::string(tr) }, fixed, typed });
+    ++translations_;
     return true;
 }
 
@@ -165,7 +186,10 @@ std::string_view CaptureFor(std::string_view name)
 
 } // namespace
 
-bool Catalog::AddChatter(std::string_view en, std::string_view tr)
+bool Catalog::AddChatter(std::string_view en, std::string_view tr) { return AddChatterImpl(en, tr, false); }
+bool Catalog::AddChatterVariant(std::string_view en, std::string_view tr) { return AddChatterImpl(en, tr, true); }
+
+bool Catalog::AddChatterImpl(std::string_view en, std::string_view tr, bool variant)
 {
     auto reject = [&]() { rejected_.emplace_back(en); return false; };
     if (en.find_first_of("{}") != std::string_view::npos || tr.find_first_of("{}") != std::string_view::npos) return reject();
@@ -201,7 +225,7 @@ bool Catalog::AddChatter(std::string_view en, std::string_view tr)
         }
         tr_tpl += tr[i++];
     }
-    if (!Add(en_tpl, tr_tpl))
+    if (!AddImpl(en_tpl, tr_tpl, variant))
     {
         rejected_.back() = std::string(en);   // name the database line, not its template
         return false;
@@ -286,10 +310,10 @@ bool MoneyInto(std::string_view cap, std::string const (&units)[3], std::string&
 
 } // namespace
 
-std::string Catalog::Fill(Pattern const& p, std::vector<std::string_view> const& caps, int depth) const
+std::string Catalog::Fill(std::string_view tr, std::vector<std::string_view> const& caps, int depth) const
 {
     std::string out;
-    out.reserve(p.tr.size() + 32);
+    out.reserve(tr.size() + 32);
     int seq = 0;
     auto put = [&](int slot) {
         if (slot < 1 || slot > int(caps.size())) return;
@@ -300,7 +324,6 @@ std::string Catalog::Fill(Pattern const& p, std::vector<std::string_view> const&
         else if (depth < kMaxDepth && TranslateList(cap, sub, depth + 1)) out += sub;
         else out.append(cap);
     };
-    std::string_view const tr = p.tr;
     for (size_t i = 0; i < tr.size(); ++i)
     {
         if (tr[i] == '{' && i + 1 < tr.size() && tr[i + 1] == '}') { put(++seq); ++i; continue; }
@@ -313,11 +336,19 @@ std::string Catalog::Fill(Pattern const& p, std::vector<std::string_view> const&
 bool Catalog::TranslateInto(std::string_view text, std::string& out, int depth) const
 {
     if (text.empty()) return false;
-    if (auto it = exact_.find(std::string(text)); it != exact_.end()) { out = it->second; return true; }
+    if (auto it = exact_.find(std::string(text)); it != exact_.end())
+    {
+        out = it->second.size() == 1 ? it->second.front() : it->second[PickVariant(it->second.size())];
+        return true;
+    }
 
     std::vector<std::string_view> caps;
     for (Pattern const& p : patterns_)
-        if (MatchPattern(p, text, caps)) { out = Fill(p, caps, depth); return true; }
+        if (MatchPattern(p, text, caps))
+        {
+            out = Fill(p.trs.size() == 1 ? p.trs.front() : p.trs[PickVariant(p.trs.size())], caps, depth);
+            return true;
+        }
 
     if (depth >= kMaxDepth) return false;
 
@@ -389,23 +420,208 @@ std::string Catalog::Translate(std::string_view text) const
     return std::string(text);
 }
 
+bool Catalog::TryTranslate(std::string_view text, std::string& out) const
+{
+    std::string tmp;
+    if (!TranslateInto(text, tmp, 0)) return false;
+    out = std::move(tmp);
+    return true;
+}
+
 bool Catalog::Knows(std::string_view text) const
 {
     std::string out;
     return TranslateInto(text, out, 0);
 }
 
+size_t PickVariant(size_t n)
+{
+    if (n < 2) return 0;
+    std::uniform_int_distribution<size_t> d(0, n - 1);
+    return d(VariantRng());
+}
+
+void SeedVariantPick(uint32_t seed)
+{
+    VariantRng().seed(seed);
+}
+
+namespace {
+
+struct LangInfo
+{
+    Lang        lang;
+    uint8_t     locale;        // the core's LocaleConstant number
+    char const* code;
+    char const* native;
+    char const* money[3];      // the client's own letters for gold, silver, copper; empty: "g s c" as the English client
+};
+
+// The money letters are the ones each client shows in its money frames and chat (deDE G/S/K, frFR po/pa/pc, es/pt o/p/c,
+// koKR 골/실/코 written out as the client does, zhCN 金/银/铜, zhTW 金/銀/銅).
+constexpr LangInfo kLangs[kLangCount] = {
+    { Lang::En,    0, "enUS", "English",    { "", "", "" } },
+    { Lang::Ru,    8, "ruRU", "Русский",    { "з", "с", "м" } },
+    { Lang::De,    3, "deDE", "Deutsch",    { "g", "s", "k" } },
+    { Lang::Fr,    2, "frFR", "Français",   { "po", "pa", "pc" } },
+    { Lang::EsES,  6, "esES", "Español (España)", { "o", "p", "c" } },
+    { Lang::EsMX,  7, "esMX", "Español (México)", { "o", "p", "c" } },
+    { Lang::PtBR, 10, "ptBR", "Português (Brasil)", { "o", "p", "c" } },
+    { Lang::Ko,    1, "koKR", "한국어",      { "골드", "실버", "코퍼" } },
+    { Lang::ZhCN,  4, "zhCN", "简体中文",    { "金", "银", "铜" } },
+    { Lang::ZhTW,  5, "zhTW", "繁體中文",    { "金", "銀", "銅" } },
+};
+
+LangInfo const& InfoOf(Lang lang)
+{
+    size_t const i = size_t(lang);
+    return kLangs[i < kLangCount ? i : 0];
+}
+
+std::string FoldAscii(std::string_view word)
+{
+    std::string w;
+    w.reserve(word.size());
+    for (char c : word)
+    {
+        if (c == '-' || c == '_' || c == ' ') continue;
+        w += (c >= 'A' && c <= 'Z') ? char(c - 'A' + 'a') : c;
+    }
+    return w;
+}
+
+// The sister catalog a missing line is looked up in before English: the other Spanish (most lines are the same in both).
+bool SisterOf(Lang lang, Lang& sister)
+{
+    if (lang == Lang::EsMX) { sister = Lang::EsES; return true; }
+    if (lang == Lang::EsES) { sister = Lang::EsMX; return true; }
+    return false;
+}
+
+std::vector<Catalog::Entry> const& NoEntries()
+{
+    static std::vector<Catalog::Entry> const none;
+    return none;
+}
+
+} // namespace
+
+Lang LangFromLocale(uint8_t locale)
+{
+    for (LangInfo const& l : kLangs)
+        if (l.locale == locale) return l.lang;
+    return Lang::En;
+}
+
+uint8_t LocaleOf(Lang lang) { return InfoOf(lang).locale; }
+char const* LangCode(Lang lang) { return InfoOf(lang).code; }
+char const* LangNativeName(Lang lang) { return InfoOf(lang).native; }
+
+bool ParseLang(std::string_view word, Lang& out)
+{
+    struct Alias { char const* word; Lang lang; };
+    // Folded: lower-case ASCII, no '-', '_' or blank. Words in other scripts are compared as typed (and in their capitalized forms).
+    static Alias const aliases[] = {
+        { "enus", Lang::En }, { "engb", Lang::En }, { "en", Lang::En }, { "eng", Lang::En }, { "english", Lang::En },
+        { "англ", Lang::En }, { "Англ", Lang::En }, { "английский", Lang::En },
+        { "ruru", Lang::Ru }, { "ru", Lang::Ru }, { "rus", Lang::Ru }, { "russian", Lang::Ru },
+        { "рус", Lang::Ru }, { "Рус", Lang::Ru }, { "русский", Lang::Ru }, { "Русский", Lang::Ru },
+        { "dede", Lang::De }, { "de", Lang::De }, { "deu", Lang::De }, { "ger", Lang::De }, { "german", Lang::De }, { "deutsch", Lang::De },
+        { "frfr", Lang::Fr }, { "fr", Lang::Fr }, { "fra", Lang::Fr }, { "french", Lang::Fr }, { "francais", Lang::Fr }, { "français", Lang::Fr },
+        { "Français", Lang::Fr },
+        { "eses", Lang::EsES }, { "es", Lang::EsES }, { "esp", Lang::EsES }, { "spanish", Lang::EsES }, { "espanol", Lang::EsES },
+        { "español", Lang::EsES }, { "Español", Lang::EsES }, { "castellano", Lang::EsES },
+        { "esmx", Lang::EsMX }, { "mx", Lang::EsMX }, { "mexican", Lang::EsMX }, { "mexicano", Lang::EsMX }, { "latino", Lang::EsMX },
+        { "ptbr", Lang::PtBR }, { "pt", Lang::PtBR }, { "br", Lang::PtBR }, { "portuguese", Lang::PtBR }, { "portugues", Lang::PtBR },
+        { "português", Lang::PtBR }, { "Português", Lang::PtBR }, { "brasileiro", Lang::PtBR },
+        { "kokr", Lang::Ko }, { "ko", Lang::Ko }, { "kr", Lang::Ko }, { "kor", Lang::Ko }, { "korean", Lang::Ko }, { "한국어", Lang::Ko },
+        { "zhcn", Lang::ZhCN }, { "cn", Lang::ZhCN }, { "zh", Lang::ZhCN }, { "chinese", Lang::ZhCN }, { "简体中文", Lang::ZhCN },
+        { "简体", Lang::ZhCN }, { "中文", Lang::ZhCN },
+        { "zhtw", Lang::ZhTW }, { "tw", Lang::ZhTW }, { "繁體中文", Lang::ZhTW }, { "繁體", Lang::ZhTW }, { "繁体", Lang::ZhTW },
+    };
+    std::string const folded = FoldAscii(word);
+    for (Alias const& a : aliases)
+        if (folded == a.word || word == a.word) { out = a.lang; return true; }
+    return false;
+}
+
+std::vector<Catalog::Entry> const& Entries(Lang lang)
+{
+    switch (lang)
+    {
+        case Lang::Ru:   return RussianEntries();
+        case Lang::De:   return GermanEntries();
+        case Lang::Fr:   return FrenchEntries();
+        case Lang::EsES: return SpanishEntries();
+        case Lang::EsMX: return MexicanEntries();
+        case Lang::PtBR: return BrazilianEntries();
+        case Lang::Ko:   return KoreanEntries();
+        case Lang::ZhCN: return SimplifiedChineseEntries();
+        case Lang::ZhTW: return TraditionalChineseEntries();
+        default:         return NoEntries();
+    }
+}
+
+std::vector<Catalog::Entry> const& ChatterEntries(Lang lang)
+{
+    switch (lang)
+    {
+        case Lang::Ru:   return RussianChatterEntries();
+        case Lang::De:   return GermanChatterEntries();
+        case Lang::Fr:   return FrenchChatterEntries();
+        case Lang::EsES: return SpanishChatterEntries();
+        case Lang::EsMX: return MexicanChatterEntries();
+        case Lang::PtBR: return BrazilianChatterEntries();
+        case Lang::Ko:   return KoreanChatterEntries();
+        case Lang::ZhCN: return SimplifiedChineseChatterEntries();
+        case Lang::ZhTW: return TraditionalChineseChatterEntries();
+        default:         return NoEntries();
+    }
+}
+
+namespace {
+
+Catalog Build(Lang lang)
+{
+    Catalog c;
+    if (lang == Lang::En) return c;
+    // Russian keeps the strict rule it was written for (one translation per line, a repeat is a typo); the newer catalogs may
+    // give a line several translations.
+    bool const variants = lang != Lang::Ru;
+    for (Catalog::Entry const& e : Entries(lang))
+        variants ? c.AddVariant(e.en, e.tr) : c.Add(e.en, e.tr);
+    for (Catalog::Entry const& e : ChatterEntries(lang))
+        variants ? c.AddChatterVariant(e.en, e.tr) : c.AddChatter(e.en, e.tr);
+    LangInfo const& info = InfoOf(lang);
+    if (*info.money[0])
+        c.SetMoneyUnits(info.money[0], info.money[1], info.money[2]);
+    return c;
+}
+
+} // namespace
+
+Catalog const& CatalogOf(Lang lang)
+{
+    // Built once each (thread-safe statics), read-only afterwards.
+    static Catalog const en;
+    switch (lang)
+    {
+        case Lang::Ru:   return Russian();
+        case Lang::De:   { static Catalog const c = Build(Lang::De);   return c; }
+        case Lang::Fr:   { static Catalog const c = Build(Lang::Fr);   return c; }
+        case Lang::EsES: { static Catalog const c = Build(Lang::EsES); return c; }
+        case Lang::EsMX: { static Catalog const c = Build(Lang::EsMX); return c; }
+        case Lang::PtBR: { static Catalog const c = Build(Lang::PtBR); return c; }
+        case Lang::Ko:   { static Catalog const c = Build(Lang::Ko);   return c; }
+        case Lang::ZhCN: { static Catalog const c = Build(Lang::ZhCN); return c; }
+        case Lang::ZhTW: { static Catalog const c = Build(Lang::ZhTW); return c; }
+        default:         return en;
+    }
+}
+
 Catalog const& Russian()
 {
-    // Built once (thread-safe static), read-only afterwards.
-    static Catalog const catalog = []
-    {
-        Catalog c(RussianEntries());
-        for (Catalog::Entry const& e : RussianChatterEntries())
-            c.AddChatter(e.en, e.tr);
-        c.SetMoneyUnits("з", "с", "м");   // золото, серебро, медь: the Russian client's own money letters
-        return c;
-    }();
+    static Catalog const catalog = Build(Lang::Ru);
     return catalog;
 }
 
@@ -416,8 +632,19 @@ bool NeverTranslate(std::string_view text)
 
 std::string Translate(Lang lang, std::string_view text)
 {
-    if (lang == Lang::En || NeverTranslate(text)) return std::string(text);
-    return Russian().Translate(text);
+    if (lang == Lang::En || size_t(lang) >= kLangCount || NeverTranslate(text)) return std::string(text);
+    std::string out;
+    if (CatalogOf(lang).TryTranslate(text, out)) return out;
+    if (Lang sister; SisterOf(lang, sister) && CatalogOf(sister).TryTranslate(text, out)) return out;
+    return std::string(text);
+}
+
+bool Knows(Lang lang, std::string_view text)
+{
+    if (lang == Lang::En || size_t(lang) >= kLangCount) return false;
+    if (CatalogOf(lang).Knows(text)) return true;
+    Lang sister;
+    return SisterOf(lang, sister) && CatalogOf(sister).Knows(text);
 }
 
 } // namespace Playerbot::Locale

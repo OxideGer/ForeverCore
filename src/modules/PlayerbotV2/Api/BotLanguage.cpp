@@ -21,6 +21,7 @@
 #include "WorldSession.h"
 
 #include <atomic>
+#include <iterator>
 #include <functional>
 #include <memory>
 #include <shared_mutex>
@@ -31,6 +32,7 @@ namespace Playerbot::BotLanguage {
 namespace {
 
 std::atomic<bool> g_enabled{ true };
+std::atomic<uint8> g_server_lang{ 0 };   // Locale::Lang of Playerbot.Localization.DefaultLocale (resolved at Load)
 
 std::shared_mutex                          g_mtx;
 std::unordered_map<uint32, Pref>           g_prefs;           // account -> the player's choice (Auto rows are not kept)
@@ -40,7 +42,7 @@ QueryCallbackProcessor g_queries;   // world thread only
 
 Locale::Lang FromLocale(LocaleConstant l)
 {
-    return l == LOCALE_ruRU ? Locale::Lang::Ru : Locale::Lang::En;
+    return Locale::LangFromLocale(uint8(l));
 }
 
 // One packet per language, built when the first reader of that language is met (Trinity::LocalizedDo keyed on our language
@@ -66,7 +68,7 @@ private:
     ChatMsg       type_;
     Language      language_;
     std::string const& english_;
-    std::unique_ptr<Trinity::ChatPacketSender> senders_[2];
+    std::unique_ptr<Trinity::ChatPacketSender> senders_[Locale::kLangCount];
 };
 
 } // namespace
@@ -80,18 +82,36 @@ void Load()
         {
             Field* f = r->Fetch();
             uint8 const v = f[1].GetUInt8();
-            if (v == uint8(Pref::En) || v == uint8(Pref::Ru))
+            if (v != uint8(Pref::Auto) && IsValidPref(v))
                 prefs[f[0].GetUInt32()] = Pref(v);
         } while (r->NextRow());
     size_t const n = prefs.size();
+
+    // Playerbot.Localization.DefaultLocale: "auto" (the realm's DBCLocale) or a language code. Anything else is logged and read
+    // as "auto", so a typo never stops the server.
+    std::string const def = sConfigMgr->GetStringDefault("Playerbot.Localization.DefaultLocale", "auto", true);
+    Locale::Lang server = FromLocale(sWorld->GetDefaultDbcLocale());
+    if (Locale::Lang parsed; !def.empty() && def != "auto" && def != "AUTO")
+    {
+        if (Locale::ParseLang(def, parsed)) server = parsed;
+        else TC_LOG_ERROR("playerbot.v2", "[language] Playerbot.Localization.DefaultLocale = \"{}\" is no language the bots know; using auto ({})",
+            def, Locale::LangCode(server));
+    }
+    g_server_lang = uint8(server);
     {
         std::unique_lock lk(g_mtx);
         g_prefs = std::move(prefs);
     }
-    TC_LOG_INFO("playerbot.v2", "[language] bot replies in the player's language {} ({} Russian catalog entries, {} players chose a language)",
-        g_enabled ? "on" : "off", Locale::Russian().Size(), n);
-    for (std::string const& bad : Locale::Russian().Rejected())
-        TC_LOG_ERROR("playerbot.v2", "[language] Russian catalog entry refused (malformed or duplicate): \"{}\"", bad);
+    TC_LOG_INFO("playerbot.v2", "[language] bot replies in the player's language {}, server language {}, {} players chose a language",
+        g_enabled ? "on" : "off", Locale::LangCode(server), n);
+    for (size_t i = 1; i < Locale::kLangCount; ++i)
+    {
+        Locale::Lang const lang = Locale::Lang(i);
+        Locale::Catalog const& c = Locale::CatalogOf(lang);
+        TC_LOG_INFO("playerbot.v2", "[language]   {}: {} lines, {} translations", Locale::LangCode(lang), c.Size(), c.Translations());
+        for (std::string const& bad : c.Rejected())
+            TC_LOG_ERROR("playerbot.v2", "[language] {} catalog entry refused (malformed or duplicate): \"{}\"", Locale::LangCode(lang), bad);
+    }
 }
 
 void OnLogin(Player* p)
@@ -124,7 +144,7 @@ Locale::Lang LangOf(Player const* reader)
     {
         std::shared_lock lk(g_mtx);
         if (auto it = g_prefs.find(account); it != g_prefs.end())
-            return it->second == Pref::Ru ? Locale::Lang::Ru : Locale::Lang::En;
+            return LangOfPref(it->second);
         if (s->GetSessionDbcLocale() != LOCALE_enUS) return FromLocale(s->GetSessionDbcLocale());
         if (s->GetSessionDbLocaleIndex() != LOCALE_enUS) return FromLocale(s->GetSessionDbLocaleIndex());
         if (auto it = g_client_locale.find(account); it != g_client_locale.end())
@@ -154,28 +174,33 @@ void SetPref(uint32 account_id, Pref pref)
             account_id, uint32(pref));
 }
 
+Locale::Lang ServerLang()
+{
+    uint8 const v = g_server_lang;
+    return v < Locale::kLangCount ? Locale::Lang(v) : Locale::Lang::En;
+}
+
 char const* PrefName(Pref pref)
 {
-    switch (pref)
-    {
-        case Pref::En: return "en";
-        case Pref::Ru: return "ru";
-        default:       return "auto";
-    }
+    // "en" and "ru" as before (the add-on and the players' habits read them); the newer languages by their short code.
+    static char const* const names[] = { "auto", "en", "ru", "de", "fr", "es", "mx", "pt", "ko", "cn", "tw" };
+    static_assert(std::size(names) == Locale::kLangCount + 1, "one name per Pref");
+    return uint8(pref) < std::size(names) ? names[uint8(pref)] : "auto";
 }
 
 bool ParsePref(std::string_view word, Pref& out)
 {
     std::string w(word);
     strToLower(w);
-    if (w == "auto" || w == "авто")                                        { out = Pref::Auto; return true; }
-    if (w == "en" || w == "english" || w == "eng" || w == "англ")          { out = Pref::En;   return true; }
-    if (w == "ru" || w == "russian" || w == "rus" || w == "рус" || w == "русский") { out = Pref::Ru; return true; }
-    // strToLower leaves Cyrillic capitals alone: the capitalised forms a Russian keyboard gives.
-    if (word == "Авто")                                                    { out = Pref::Auto; return true; }
-    if (word == "Рус" || word == "Русский")                                { out = Pref::Ru;   return true; }
-    if (word == "Англ")                                                    { out = Pref::En;   return true; }
-    return false;
+    // The word for "the client's language" in every language the bots speak, Cyrillic capitals included (strToLower leaves them).
+    static char const* const autos[] = { "auto", "авто", "Авто", "automatisch", "automatique", "automático", "automatico",
+        "자동", "自动", "自動" };
+    for (char const* a : autos)
+        if (w == a || word == a) { out = Pref::Auto; return true; }
+    Locale::Lang lang;
+    if (!Locale::ParseLang(word, lang)) return false;
+    out = PrefFor(lang);
+    return true;
 }
 
 std::string For(Player const* reader, std::string_view english)
@@ -235,8 +260,8 @@ public:
 
 private:
     std::string const& english_;
-    std::string texts_[2];
-    bool made_[2] = { false, false };
+    std::string texts_[Locale::kLangCount];
+    bool made_[Locale::kLangCount] = { };
 };
 
 } // namespace

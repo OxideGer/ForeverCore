@@ -2101,13 +2101,13 @@ Player* MomentListener(Player* bot)
     return first;
 }
 
-// The language a player reads the bots in ("ruRU", "enUS"): his `.bot language` choice, else his game client's
+// The language a player reads the bots in ("ruRU", "enUS", "deDE", ...): his `.bot language` choice, else his game client's
 // (BotLanguage::LangOf, the same as every translated bot line). Not the session's DBC locale: on a realm without the
 // Russian client data that is the realm's own (enUS), so a Russian client was told to the program as enUS and got English
 // street talk, posts and moments (cyborgx5, GitHub #12, 2026-11-16).
 char const* ReaderLocale(Player const* player)
 {
-    return BotLanguage::LangOf(player) == Locale::Lang::Ru ? "ruRU" : "enUS";
+    return Locale::LangCode(BotLanguage::LangOf(player));
 }
 
 // The program answers a Russian client in Russian when his line gives no language of its own (a moment, "ok", a link).
@@ -2121,13 +2121,21 @@ std::string ClientLocale(Player const* player)
 template <typename Players>
 std::string MostReadLocale(Players const& players)
 {
-    uint32 ru = 0, en = 0;
+    uint32 readers[Locale::kLangCount] = { };
+    uint32 total = 0;
     for (Player const* p : players)
         if (p && p->GetSession() && !Services::Registry().has(p->GetGUID().GetCounter()))
-            ++(BotLanguage::LangOf(p) == Locale::Lang::Ru ? ru : en);
-    if (!ru && !en)
-        return sWorld->GetDefaultDbcLocale() == LOCALE_ruRU ? "ruRU" : "enUS";
-    return ru > en ? "ruRU" : "enUS";
+        {
+            ++readers[size_t(BotLanguage::LangOf(p))];
+            ++total;
+        }
+    if (!total)
+        return Locale::LangCode(BotLanguage::ServerLang());
+    // The most read language; a tie goes to the lower number (English first, then Russian, as the two-language code did).
+    size_t best = 0;
+    for (size_t i = 1; i < Locale::kLangCount; ++i)
+        if (readers[i] > readers[best]) best = i;
+    return Locale::LangCode(Locale::Lang(best));
 }
 
 // The language most real players on the bot's map read, for lines no one player asked for (a street talk, a General or
