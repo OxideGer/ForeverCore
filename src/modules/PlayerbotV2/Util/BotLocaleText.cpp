@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <random>
+#include <set>
 #include <utility>
 
 namespace Playerbot::Locale {
@@ -588,10 +589,15 @@ Catalog Build(Lang lang)
     // Russian keeps the strict rule it was written for (one translation per line, a repeat is a typo); the newer catalogs may
     // give a line several translations.
     bool const variants = lang != Lang::Ru;
+    // A short line can be both a code line and a database line ("lol", "ty") with the same translation in both tables: the
+    // second copy adds nothing and is skipped instead of being reported as a duplicate.
+    std::set<std::pair<std::string_view, std::string_view>> seen;
     for (Catalog::Entry const& e : Entries(lang))
-        variants ? c.AddVariant(e.en, e.tr) : c.Add(e.en, e.tr);
+        if (!variants || seen.emplace(e.en, e.tr).second)
+            variants ? c.AddVariant(e.en, e.tr) : c.Add(e.en, e.tr);
     for (Catalog::Entry const& e : ChatterEntries(lang))
-        variants ? c.AddChatterVariant(e.en, e.tr) : c.AddChatter(e.en, e.tr);
+        if (!variants || seen.emplace(e.en, e.tr).second)
+            variants ? c.AddChatterVariant(e.en, e.tr) : c.AddChatter(e.en, e.tr);
     LangInfo const& info = InfoOf(lang);
     if (*info.money[0])
         c.SetMoneyUnits(info.money[0], info.money[1], info.money[2]);

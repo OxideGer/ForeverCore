@@ -2,6 +2,7 @@
 
 #include "BotConversation.h"
 #include "TradeTalk.h"
+#include "../Util/BotLocaleText.h"
 
 #include <algorithm>
 #include <cctype>
@@ -73,65 +74,95 @@ struct Destination
     char const* ru_keys[4];                // the Russian names a player types, folded (lower case, ё as е); a phrase is matched whole
     char const* ru_name;                   // the client's Russian name
     char const* ru_route;
+    char const* de_keys[3];                // the German names a player types, lower case (umlauts as typed)
+    char const* de_name;                   // the deDE client's name
+    char const* de_route;
 };
 
 // Vanilla geography only; nothing here that is not true of the Classic world. The Russian names are the ruRU client's.
 Destination const kDestinations[] = {
     { { "stormwind", "sw" }, "Stormwind", "follow the road out of Elwynn Forest, or take the Deeprun Tram from Ironforge",
-      { "штормград", "штормграде", "штормграда", "шторм" }, "Штормград", "иди по дороге из Элвиннского леса или садись на подземку в Стальгорне" },
+      { "штормград", "штормграде", "штормграда", "шторм" }, "Штормград", "иди по дороге из Элвиннского леса или садись на подземку в Стальгорне",
+      { "sturmwind", "sw" }, "Sturmwind", "folg der Straße aus dem Wald von Elwynn, oder nimm die Tiefenbahn aus Eisenschmiede" },
     { { "ironforge" }, "Ironforge", "it is in Dun Morogh, or take the Deeprun Tram from Stormwind",
-      { "стальгорн", "стальгорне", "стальгорна" }, "Стальгорн", "он в Дун Мороге, или садись на подземку в Штормграде" },
+      { "стальгорн", "стальгорне", "стальгорна" }, "Стальгорн", "он в Дун Мороге, или садись на подземку в Штормграде",
+      { "eisenschmiede" }, "Eisenschmiede", "die liegt in Dun Morogh, oder nimm die Tiefenbahn aus Sturmwind" },
     { { "darnassus" }, "Darnassus", "it is up in Teldrassil, and a boat from Auberdine in Darkshore gets you to Rutheran Village",
-      { "дарнас", "дарнасе", "дарнаса" }, "Дарнас", "он наверху Тельдрассила, корабль из Аубердина на Темных берегах идет в деревню Рут'теран" },
+      { "дарнас", "дарнасе", "дарнаса" }, "Дарнас", "он наверху Тельдрассила, корабль из Аубердина на Темных берегах идет в деревню Рут'теран",
+      { "darnassus" }, "Darnassus", "das liegt oben auf Teldrassil, ein Schiff aus Auberdine an der Dunkelküste bringt dich nach Rut'theran" },
     { { "orgrimmar", "org" }, "Orgrimmar", "it is in Durotar, and the zeppelin from Tirisfal Glades brings you right to it",
-      { "оргриммар", "оргриммаре", "оргриммара", "огри" }, "Оргриммар", "он в Дуротаре, цеппелин из Тирисфальских лесов прилетает прямо туда" },
+      { "оргриммар", "оргриммаре", "оргриммара", "огри" }, "Оргриммар", "он в Дуротаре, цеппелин из Тирисфальских лесов прилетает прямо туда",
+      { "orgrimmar", "orgri" }, "Orgrimmar", "das liegt in Durotar, der Zeppelin aus Tirisfal bringt dich direkt hin" },
     { { "thunder bluff", "tb" }, "Thunder Bluff", "it is up on the mesas of Mulgore, take the lift up",
-      { "громовой утес", "громового утеса", "громовом утесе" }, "Громовой Утес", "он на столовых горах Мулгора, поднимайся на лифте" },
+      { "громовой утес", "громового утеса", "громовом утесе" }, "Громовой Утес", "он на столовых горах Мулгора, поднимайся на лифте",
+      { "donnerfels" }, "Donnerfels", "das liegt oben auf den Hochebenen von Mulgore, nimm den Aufzug" },
     { { "undercity", "uc" }, "Undercity", "the entrance is in Tirisfal Glades, by the ruins of Lordaeron",
-      { "подгород", "подгороде", "подгорода", "андерсити" }, "Подгород", "вход в Тирисфальских лесах, у руин Лордерона" },
+      { "подгород", "подгороде", "подгорода", "андерсити" }, "Подгород", "вход в Тирисфальских лесах, у руин Лордерона",
+      { "unterstadt" }, "Unterstadt", "der Eingang ist in Tirisfal, bei den Ruinen von Lordaeron" },
     { { "elwynn forest", "elwynn" }, "Elwynn Forest", "it is the zone around Stormwind, head out of the main gate",
-      { "элвиннский лес", "элвин", "элвинн", "элвиннском лесу" }, "Элвиннский лес", "это лес вокруг Штормграда, выходи через главные ворота" },
+      { "элвиннский лес", "элвин", "элвинн", "элвиннском лесу" }, "Элвиннский лес", "это лес вокруг Штормграда, выходи через главные ворота",
+      { "wald von elwynn", "elwynn" }, "Wald von Elwynn", "das ist der Wald rund um Sturmwind, raus durchs Haupttor" },
     { { "westfall" }, "Westfall", "it is just west of Elwynn Forest",
-      { "западный край", "западном крае", "западного края" }, "Западный Край", "он сразу к западу от Элвиннского леса" },
+      { "западный край", "западном крае", "западного края" }, "Западный Край", "он сразу к западу от Элвиннского леса",
+      { "westfall" }, "Westfall", "das liegt direkt westlich vom Wald von Elwynn" },
     { { "duskwood" }, "Duskwood", "it is south of Elwynn Forest",
-      { "сумеречный лес", "сумеречном лесу", "сумеречного леса" }, "Сумеречный лес", "он к югу от Элвиннского леса" },
+      { "сумеречный лес", "сумеречном лесу", "сумеречного леса" }, "Сумеречный лес", "он к югу от Элвиннского леса",
+      { "dämmerwald", "daemmerwald" }, "Dämmerwald", "der liegt südlich vom Wald von Elwynn" },
     { { "redridge mountains", "redridge" }, "Redridge Mountains", "it is east of Elwynn Forest",
-      { "красногорье", "красногорья" }, "Красногорье", "оно к востоку от Элвиннского леса" },
+      { "красногорье", "красногорья" }, "Красногорье", "оно к востоку от Элвиннского леса",
+      { "rotkammgebirge", "rotkamm" }, "Rotkammgebirge", "das liegt östlich vom Wald von Elwynn" },
     { { "dun morogh" }, "Dun Morogh", "it is the snowy zone around Ironforge",
-      { "дун морог", "дун мороге", "дун морога" }, "Дун Морог", "это снежная зона вокруг Стальгорна" },
+      { "дун морог", "дун мороге", "дун морога" }, "Дун Морог", "это снежная зона вокруг Стальгорна",
+      { "dun morogh" }, "Dun Morogh", "das ist das verschneite Gebiet rund um Eisenschmiede" },
     { { "loch modan" }, "Loch Modan", "it is east of Dun Morogh",
-      { "лок модан", "лок модане", "лок модана" }, "Лок Модан", "он к востоку от Дун Морога" },
+      { "лок модан", "лок модане", "лок модана" }, "Лок Модан", "он к востоку от Дун Морога",
+      { "loch modan" }, "Loch Modan", "das liegt östlich von Dun Morogh" },
     { { "teldrassil" }, "Teldrassil", "take the boat from Auberdine in Darkshore to Rutheran Village",
-      { "тельдрассил", "тельдрассиле", "тельдрассила" }, "Тельдрассил", "плыви на корабле из Аубердина на Темных берегах до деревни Рут'теран" },
+      { "тельдрассил", "тельдрассиле", "тельдрассила" }, "Тельдрассил", "плыви на корабле из Аубердина на Темных берегах до деревни Рут'теран",
+      { "teldrassil" }, "Teldrassil", "nimm das Schiff aus Auberdine an der Dunkelküste nach Rut'theran" },
     { { "darkshore" }, "Darkshore", "it is the coast south of Teldrassil, reach it by boat from Rutheran Village",
-      { "темные берега", "темных берегах", "темных берегов" }, "Темные берега", "это побережье к югу от Тельдрассила, туда ходит корабль из деревни Рут'теран" },
+      { "темные берега", "темных берегах", "темных берегов" }, "Темные берега", "это побережье к югу от Тельдрассила, туда ходит корабль из деревни Рут'теран",
+      { "dunkelküste", "dunkelkueste" }, "Dunkelküste", "das ist die Küste südlich von Teldrassil, ein Schiff aus Rut'theran fährt hin" },
     { { "durotar" }, "Durotar", "it is the orc starting zone, Orgrimmar is there, just east of the Barrens",
-      { "дуротар", "дуротаре", "дуротара" }, "Дуротар", "это стартовая зона орков, там Оргриммар, сразу к востоку от Степей" },
+      { "дуротар", "дуротаре", "дуротара" }, "Дуротар", "это стартовая зона орков, там Оргриммар, сразу к востоку от Степей",
+      { "durotar" }, "Durotar", "das ist das Startgebiet der Orcs, dort liegt Orgrimmar, gleich östlich vom Brachland" },
     { { "mulgore" }, "Mulgore", "it is south-west of the Barrens, Thunder Bluff is there",
-      { "мулгор", "мулгоре", "мулгора" }, "Мулгор", "он к юго-западу от Степей, там Громовой Утес" },
+      { "мулгор", "мулгоре", "мулгора" }, "Мулгор", "он к юго-западу от Степей, там Громовой Утес",
+      { "mulgore" }, "Mulgore", "das liegt südwestlich vom Brachland, dort ist Donnerfels" },
     { { "the barrens", "barrens", "crossroads" }, "The Barrens", "it is between Durotar and Mulgore, the Crossroads is the main town",
-      { "степи", "степях", "степей", "перекресток" }, "Степи", "они между Дуротаром и Мулгором, главный городок там Перекресток" },
+      { "степи", "степях", "степей", "перекресток" }, "Степи", "они между Дуротаром и Мулгором, главный городок там Перекресток",
+      { "brachland", "das brachland", "wegekreuz" }, "Brachland", "das liegt zwischen Durotar und Mulgore, die Hauptstadt dort ist das Wegekreuz" },
     { { "tirisfal glades", "tirisfal" }, "Tirisfal Glades", "it is the undead starting zone, Undercity is below it",
-      { "тирисфальские леса", "тирисфальских лесах", "тирисфаль", "тирисфальских лесов" }, "Тирисфальские леса", "это стартовая зона нежити, под ней Подгород" },
+      { "тирисфальские леса", "тирисфальских лесах", "тирисфаль", "тирисфальских лесов" }, "Тирисфальские леса", "это стартовая зона нежити, под ней Подгород",
+      { "tirisfal" }, "Tirisfal", "das ist das Startgebiet der Untoten, darunter liegt Unterstadt" },
     // The dungeons of the low levels: "where is deadmines" in General went unanswered (GitHub #12, 2026-11-17).
     { { "deadmines", "deadmine" }, "the Deadmines", "it is under Moonbrook in Westfall, the entrance is in the mine there",
-      { "мертвые копи", "мертвых копях", "мертвых копей", "дедмайнс" }, "Мертвые копи", "они под Луноречьем в Западном Крае, вход в шахте там" },
+      { "мертвые копи", "мертвых копях", "мертвых копей", "дедмайнс" }, "Мертвые копи", "они под Луноречьем в Западном Крае, вход в шахте там",
+      { "todesminen", "die todesminen" }, "Todesminen", "die liegen unter Mondbruch in Westfall, der Eingang ist in der Mine dort" },
     { { "wailing caverns", "wailing" }, "Wailing Caverns", "it is in the Barrens, in a cave by the oasis south-west of the Crossroads",
-      { "пещеры стенаний", "пещерах стенаний", "пещер стенаний" }, "Пещеры Стенаний", "они в Степях, в пещере у оазиса к юго-западу от Перекрестка" },
+      { "пещеры стенаний", "пещерах стенаний", "пещер стенаний" }, "Пещеры Стенаний", "они в Степях, в пещере у оазиса к юго-западу от Перекрестка",
+      { "höhlen des wehklagens", "wehklagen", "hdw" }, "Höhlen des Wehklagens", "die liegen im Brachland, in einer Höhle an der Oase südwestlich vom Wegekreuz" },
     { { "ragefire chasm", "ragefire", "rfc" }, "Ragefire Chasm", "it is inside Orgrimmar, in the Cleft of Shadow",
-      { "огненная пропасть", "огненной пропасти", "огненную пропасть" }, "Огненная пропасть", "она внутри Оргриммара, в Расселине Теней" },
+      { "огненная пропасть", "огненной пропасти", "огненную пропасть" }, "Огненная пропасть", "она внутри Оргриммара, в Расселине Теней",
+      { "flammenschlund", "der flammenschlund", "rfc" }, "Flammenschlund", "der liegt in Orgrimmar, in der Kluft der Schatten" },
     { { "shadowfang keep", "shadowfang", "sfk" }, "Shadowfang Keep", "it is the castle in Silverpine Forest, near Pyrewood Village",
-      { "крепость темного клыка", "крепости темного клыка", "темного клыка" }, "Крепость Темного Клыка", "это замок в Серебряном бору" },
+      { "крепость темного клыка", "крепости темного клыка", "темного клыка" }, "Крепость Темного Клыка", "это замок в Серебряном бору",
+      { "burg schattenfang", "schattenfang", "bsf" }, "Burg Schattenfang", "das ist die Burg im Silberwald, bei Lohenscheit" },
     { { "blackfathom deeps", "blackfathom", "bfd" }, "Blackfathom Deeps", "it is on the Zoram Strand coast of Ashenvale",
-      { "непроглядная пучина", "непроглядной пучине", "непроглядную пучину" }, "Непроглядная Пучина", "она на западном побережье Ясеневого леса" },
+      { "непроглядная пучина", "непроглядной пучине", "непроглядную пучину" }, "Непроглядная Пучина", "она на западном побережье Ясеневого леса",
+      { "tiefschwarze grotte", "grotte", "bfd" }, "Tiefschwarze Grotte", "die liegt am Zoramstrand an der Küste des Eschentals" },
     { { "gnomeregan", "gnomer" }, "Gnomeregan", "it is in Dun Morogh, west of Ironforge",
-      { "гномреган", "гномрегане", "гномрегана" }, "Гномреган", "он в Дун Мороге, к западу от Стальгорна" },
+      { "гномреган", "гномрегане", "гномрегана" }, "Гномреган", "он в Дун Мороге, к западу от Стальгорна",
+      { "gnomeregan", "gnomer" }, "Gnomeregan", "das liegt in Dun Morogh, westlich von Eisenschmiede" },
     { { "razorfen kraul", "rfk" }, "Razorfen Kraul", "it is in the far south of the Barrens, by Thousand Needles",
-      { "лабиринты иглошкурых", "лабиринтах иглошкурых", "лабиринтов иглошкурых" }, "Лабиринты Иглошкурых", "они на самом юге Степей, у Тысячи Игл" },
+      { "лабиринты иглошкурых", "лабиринтах иглошкурых", "лабиринтов иглошкурых" }, "Лабиринты Иглошкурых", "они на самом юге Степей, у Тысячи Игл",
+      { "kral der klingenhauer", "kral", "rfk" }, "Kral der Klingenhauer", "der liegt ganz im Süden vom Brachland, bei Tausend Nadeln" },
     { { "scarlet monastery", "monastery" }, "the Scarlet Monastery", "it is in the north-east of Tirisfal Glades",
-      { "монастырь алого ордена", "монастыре алого ордена", "монастырь", "монастыре" }, "Монастырь Алого ордена", "он на северо-востоке Тирисфальских лесов" },
+      { "монастырь алого ордена", "монастыре алого ордена", "монастырь", "монастыре" }, "Монастырь Алого ордена", "он на северо-востоке Тирисфальских лесов",
+      { "scharlachrote kloster", "kloster" }, "Scharlachrotes Kloster", "das liegt im Nordosten von Tirisfal" },
     { { "stockade", "stockades", "stocks" }, "the Stockade", "it is inside Stormwind City",
-      { "тюрьма", "тюрьму", "тюрьме", "тюрьмы" }, "Тюрьма", "она внутри Штормграда" },
+      { "тюрьма", "тюрьму", "тюрьме", "тюрьмы" }, "Тюрьма", "она внутри Штормграда",
+      { "verlies", "das verlies" }, "Verlies", "das ist mitten in Sturmwind" },
 };
 
 Destination const* FindDestination(std::string const& norm)
@@ -144,6 +175,9 @@ Destination const* FindDestination(std::string const& norm)
         for (char const* k : d.ru_keys)
             if (k && HasWord(norm, k))
                 return &d;
+        for (char const* k : d.de_keys)
+            if (k && HasWord(norm, k))
+                return &d;
     }
     return nullptr;
 }
@@ -152,7 +186,7 @@ Destination const* FindDestination(std::string const& norm)
 
 bool IsYouWord(std::string const& norm)
 {
-    return HasAny(norm, { "you", "u", "ya", "yourself", "your", "ur" });
+    return HasAny(norm, { "you", "u", "ya", "yourself", "your", "ur", "du", "dich", "dir", "dein", "deine", "bist" });
 }
 
 } // namespace
@@ -200,30 +234,37 @@ ConvIntent ConvClassify(std::string const& norm, std::string* slot)
     if (HasAny(norm, { "stupid", "idiot", "noob", "suck", "sucks", "trash", "useless", "dumb", "moron", "ugly", "stfu" }) ||
         HasWord(norm, "shut up") || HasWord(norm, "fuck you") || HasWord(norm, "f you") ||
         HasAny(norm, { "тупой", "тупая", "дурак", "дура", "идиот", "нуб", "лох", "лошара", "отстой", "бесполезный", "бесполезная",
-                       "заткнись", "дебил", "урод", "криворукий" }))
+                       "заткнись", "дебил", "урод", "криворукий" }) ||
+        HasAny(norm, { "blöd", "bloed", "doof", "dumm", "depp", "trottel", "vollidiot", "nervst", "lappen", "halt die klappe", "klappe" }))
         return ConvIntent::Insult;
 
     // "are you a bot?" before the rest: "are you a bot or a real player" is not a group question.
     if ((you && HasAny(norm, { "bot", "bots", "ai", "robot", "npc", "human", "program", "script", "scripted" })) ||
         HasWord(norm, "real person") || HasWord(norm, "real player") ||
-        (HasAny(norm, { "бот", "боты", "робот", "нейросеть", "нейронка", "ии", "нпс", "живой", "человек", "скрипт" }) && you))
+        (HasAny(norm, { "бот", "боты", "робот", "нейросеть", "нейронка", "ии", "нпс", "живой", "человек", "скрипт" }) && you) ||
+        (HasAny(norm, { "ki", "mensch", "echter spieler", "programm", "skript" }) && you))
         return ConvIntent::AreYouBot;
 
     if (HasAny(norm, { "bye", "cya", "goodbye", "gn", "goodnight", "gtg", "g2g", "later", "laters", "farewell", "ttyl", "see you", "see ya" }) ||
         HasWord(norm, "good night") || HasWord(norm, "got to go") || HasWord(norm, "have to go") ||
-        HasAny(norm, { "пока", "бб", "бай", "увидимся", "споки", "до встречи", "спокойной ночи", "мне пора", "до свидания" }))
+        HasAny(norm, { "пока", "бб", "бай", "увидимся", "споки", "до встречи", "спокойной ночи", "мне пора", "до свидания" }) ||
+        HasAny(norm, { "tschüss", "tschüs", "tschuess", "tschö", "ciao", "bis dann", "bis später", "bis spaeter", "bis bald", "gute nacht",
+                       "muss los", "bin weg", "man sieht sich" }))
         return ConvIntent::Goodbye;
 
     if (HasAny(norm, { "thanks", "thank", "thx", "ty", "tyvm", "tysm", "thnx" }) || HasWord(norm, "appreciate it") ||
-        HasAny(norm, { "спасибо", "спс", "пасиб", "пасибо", "благодарю", "сенкс", "спасибки" }))
+        HasAny(norm, { "спасибо", "спс", "пасиб", "пасибо", "благодарю", "сенкс", "спасибки" }) ||
+        HasAny(norm, { "danke", "dankeschön", "danke schön", "merci", "dankö", "vielen dank" }))
         return ConvIntent::Thanks;
 
     if (HasWord(norm, "joke") || HasWord(norm, "funny") || HasWord(norm, "make me laugh") ||
-        HasAny(norm, { "анекдот", "шутку", "пошути", "рассмеши", "шутка" }))
+        HasAny(norm, { "анекдот", "шутку", "пошути", "рассмеши", "шутка" }) ||
+        HasAny(norm, { "witz", "erzähl was lustiges", "mach mal einen witz" }))
         return ConvIntent::Joke;
 
     if (HasAny(norm, { "duel", "duels", "dueling", "1v1", "spar" }) ||
-        HasAny(norm, { "дуэль", "дуэли", "дуэльку", "подуэлимся", "дуэлимся", "дуэлька" }))
+        HasAny(norm, { "дуэль", "дуэли", "дуэльку", "подуэлимся", "дуэлимся", "дуэлька" }) ||
+        HasAny(norm, { "duell", "duellieren", "duellchen" }))
         return ConvIntent::Duel;
 
     // Directions: "how do i get to X", "where is X", "way to X", "path to X", "how to get to X" (Russian: "как пройти в X", "где X").
@@ -232,7 +273,9 @@ ConvIntent ConvClassify(std::string const& norm, std::string* slot)
                           HasWord(norm, "route") || (HasWord(norm, "where") && (HasWord(norm, "is") || HasWord(norm, "s") || HasWord(norm, "are")) && !you) ||
                           HasWord(norm, "wheres") ||
                           HasAny(norm, { "как пройти", "как добраться", "как попасть", "как дойти", "где находится", "дорогу" }) ||
-                          ((HasWord(norm, "где") || HasWord(norm, "куда")) && !you);
+                          ((HasWord(norm, "где") || HasWord(norm, "куда")) && !you) ||
+                          HasAny(norm, { "wie komme ich", "wie komm ich", "wie kommt man", "wo ist", "wo liegt", "wo geht es", "wo gehts",
+                                         "wie finde ich", "weg nach", "weg zu" });
     if (asks_way)
     {
         if (Destination const* d = FindDestination(norm))
@@ -263,49 +306,68 @@ ConvIntent ConvClassify(std::string const& norm, std::string* slot)
             return ConvIntent::QuestHelp;
     }
 
-    if (HasAny(norm, { "guild", "guilds" }) || HasAny(norm, { "гильдия", "гильдию", "гильдии", "гильда", "гильду", "ги" }))
+    if (HasAny(norm, { "aufgabe", "aufgaben" }) || ((HasWord(norm, "quest") || HasWord(norm, "quests")) &&
+        HasAny(norm, { "hilf", "hilfe", "wo", "wie", "stecke", "zusammen", "lust", "machst", "hast" })))
+    {
+        bool const plea = HasAny(norm, { "hilf", "hilfe", "wo", "wie", "stecke", "finde" });
+        if (!plea && HasAny(norm, { "zusammen", "lust", "machen wir", "gemeinsam" }))
+            return ConvIntent::GroupInvite;
+        if (plea || HasAny(norm, { "machst", "hast" }))
+            return ConvIntent::QuestHelp;
+    }
+
+    if (HasAny(norm, { "guild", "guilds" }) || HasAny(norm, { "гильдия", "гильдию", "гильдии", "гильда", "гильду", "ги" }) ||
+        HasAny(norm, { "gilde", "gilden" }))
         return ConvIntent::Guild;
 
     if (HasAny(norm, { "profession", "professions", "craft", "crafting", "crafter", "enchant", "enchanter", "mats", "recipe", "recipes", "mining",
                        "herbalism", "skinning", "tailoring", "alchemy", "blacksmithing", "engineering", "leatherworking", "cooking", "fishing" }) ||
         HasWord(norm, "make me") || HasWord(norm, "can you make") ||
-        HasAny(norm, { "профессия", "профессии", "профу", "профа", "крафт", "скрафтить", "скрафтишь", "скрафти", "рецепт", "рецепты" }))
+        HasAny(norm, { "профессия", "профессии", "профу", "профа", "крафт", "скрафтить", "скрафтишь", "скрафти", "рецепт", "рецепты" }) ||
+        HasAny(norm, { "beruf", "berufe", "herstellen", "craften", "rezept", "rezepte", "bergbau", "kräuterkunde", "kürschnerei", "schneiderei",
+                       "alchemie", "schmiedekunst", "ingenieurskunst", "lederverarbeitung", "verzauberkunst", "kochkunst", "angeln" }))
         return ConvIntent::Trade;
 
     if (HasAny(norm, { "wtt" }) ||
         (HasWord(norm, "trade") && (HasAny(norm, { "wanna", "want", "can", "lets", "do", "u", "you" }) || norm == "trade")) ||
-        HasAny(norm, { "трейд", "обмен", "обменяемся", "обменяться", "поторгуем", "поторговать", "торговать" }))
+        HasAny(norm, { "трейд", "обмен", "обменяемся", "обменяться", "поторгуем", "поторговать", "торговать" }) ||
+        HasAny(norm, { "handeln", "tauschen", "handel" }))
         return ConvIntent::WantTrade;
 
-    if ((HasWord(norm, "where") && HasAny(norm, { "from", "come from", "born" })) || HasWord(norm, "откуда"))
+    if ((HasWord(norm, "where") && HasAny(norm, { "from", "come from", "born" })) || HasWord(norm, "откуда") || HasWord(norm, "woher"))
         return ConvIntent::WhereFrom;
 
     if ((HasAny(norm, { "name", "called" }) && !HasAny(norm, { "quest", "quests" }) && (you || HasWord(norm, "whats") || HasWord(norm, "what"))) || HasWord(norm, "who are you") ||
         HasWord(norm, "who r u") || HasWord(norm, "who is this") ||
-        HasAny(norm, { "как тебя зовут", "как зовут", "твое имя", "кто ты", "ты кто" }))
+        HasAny(norm, { "как тебя зовут", "как зовут", "твое имя", "кто ты", "ты кто" }) ||
+        HasAny(norm, { "wie heißt du", "wie heisst du", "dein name", "wer bist du" }))
         return ConvIntent::Name;
 
     if ((HasWord(norm, "where") && you) || ((HasWord(norm, "где") || HasWord(norm, "куда")) && you))
         return ConvIntent::WhereAreYou;
-    if (HasWord(norm, "wherer") || HasWord(norm, "wo bist du"))
+    if (HasWord(norm, "wherer") || HasWord(norm, "wo bist du") || HasWord(norm, "wo steckst du") || HasWord(norm, "wo treibst du dich rum"))
         return ConvIntent::WhereAreYou;
 
-    if ((HasAny(norm, { "level", "lvl", "lv" }) && !HasWord(norm, "how to level")) || HasAny(norm, { "уровень", "лвл", "лвл?", "уровня", "левел" }))
+    if ((HasAny(norm, { "level", "lvl", "lv" }) && !HasWord(norm, "how to level")) || HasAny(norm, { "уровень", "лвл", "лвл?", "уровня", "левел" }) ||
+        HasAny(norm, { "welches level", "welche stufe", "stufe" }))
         return ConvIntent::Level;
 
     if (((HasWord(norm, "class") || HasWord(norm, "spec") || HasWord(norm, "talents")) && (you || HasWord(norm, "what") || HasWord(norm, "which"))) ||
-        HasAny(norm, { "какой класс", "кем играешь", "спек", "какой спек", "за кого играешь" }))
+        HasAny(norm, { "какой класс", "кем играешь", "спек", "какой спек", "за кого играешь" }) ||
+        HasAny(norm, { "welche klasse", "was spielst du", "skillung", "was für eine klasse" }))
         return ConvIntent::ClassSpec;
 
     if (((HasWord(norm, "how") || HasWord(norm, "hows")) && ((HasAny(norm, { "are", "r", "re" }) && you) || HasAny(norm, { "going", "doing", "things", "been", "life" }))) ||
-        HasAny(norm, { "как дела", "как ты", "как жизнь", "как сам", "как оно", "как поживаешь", "как настроение" }))
+        HasAny(norm, { "как дела", "как ты", "как жизнь", "как сам", "как оно", "как поживаешь", "как настроение" }) ||
+        HasAny(norm, { "wie gehts", "wie geht es dir", "wie geht es", "wie läufts", "wie laeufts", "alles klar bei dir", "alles gut bei dir", "na wie gehts" }))
         return ConvIntent::HowAreYou;
     if (HasAny(norm, { "hbu", "wbu", "whats up", "wassup", "wazzup" }) && !HasWord(norm, "doing"))
         return ConvIntent::HowAreYou;
 
     if ((HasWord(norm, "what") && (HasWord(norm, "doing") || HasWord(norm, "up to"))) || HasWord(norm, "wyd") ||
         (HasWord(norm, "sup") && HasWord(norm, "doing")) || HasWord(norm, "busy") ||
-        HasAny(norm, { "что делаешь", "че делаешь", "чо делаешь", "чем занят", "чем занимаешься", "что творишь", "занят" }))
+        HasAny(norm, { "что делаешь", "че делаешь", "чо делаешь", "чем занят", "чем занимаешься", "что творишь", "занят" }) ||
+        HasAny(norm, { "was machst du", "was treibst du", "was machste", "beschäftigt" }))
         return ConvIntent::WhatDoing;
 
     if (HasAny(norm, { "group", "party", "team", "invite", "lfg", "lfm", "dungeon", "dungeons", "run", "join" }))
@@ -317,28 +379,35 @@ ConvIntent ConvClassify(std::string const& norm, std::string* slot)
         HasAny(norm, { "хочешь", "давай", "го", "можно", "пойдешь", "пойдем", "возьми", "возьмешь", "примешь", "нужен", "нужна", "ищу",
                        "кинь", "кинуть", "инв", "инвайт", "пойти", "вступить", "вместе", "с нами" }))
         return ConvIntent::GroupInvite;
+    if (HasAny(norm, { "gruppe", "inv", "einladen", "lad mich ein", "dungeon", "instanz", "raid" }) &&
+        HasAny(norm, { "willst", "lust", "kommst", "mitkommen", "brauchst", "komm", "suchst", "mit", "lad", "inv" }))
+        return ConvIntent::GroupInvite;
 
     if (HasWord(norm, "do you like") || HasWord(norm, "do u like") || HasWord(norm, "you like") || HasWord(norm, "u like") ||
         HasWord(norm, "like it") || HasWord(norm, "enjoying") || HasWord(norm, "is it fun") || HasWord(norm, "having fun") ||
-        HasAny(norm, { "нравится", "нравятся", "любишь", "по кайфу", "интересно играть" }))
+        HasAny(norm, { "нравится", "нравятся", "любишь", "по кайфу", "интересно играть" }) ||
+        HasAny(norm, { "gefällt", "gefaellt", "macht spaß", "macht spass", "magst du" }))
         return ConvIntent::LikeIt;
 
     if (HasWord(norm, "help me") || HasWord(norm, "can you help") || HasWord(norm, "can u help") || HasWord(norm, "need help") ||
         HasWord(norm, "help pls") || HasWord(norm, "help plz") || norm == "help" ||
-        HasAny(norm, { "помоги", "помогите", "помочь", "нужна помощь", "поможешь" }))
+        HasAny(norm, { "помоги", "помогите", "помочь", "нужна помощь", "поможешь" }) ||
+        HasAny(norm, { "hilf mir", "kannst du helfen", "brauche hilfe", "brauch hilfe", "hilfe" }))
         return ConvIntent::Help;
 
     if (HasAny(norm, { "awesome", "amazing", "nice", "cool", "great", "love", "best", "rock", "rocks", "legend" }) &&
         (you || HasAny(norm, { "job", "bot", "player" })))
         return ConvIntent::Compliment;
-    if (HasAny(norm, { "молодец", "красава", "красавчик", "крутой", "крут", "лучший", "респект", "уважаю" }))
+    if (HasAny(norm, { "молодец", "красава", "красавчик", "крутой", "крут", "лучший", "респект", "уважаю" }) ||
+        (HasAny(norm, { "super", "toll", "klasse", "stark", "ehrenmann", "bester", "beste", "geil" }) && (you || HasAny(norm, { "gemacht", "bot", "spieler" }))))
         return ConvIntent::Compliment;
 
     // A short line that opens with a greeting ("hi", "hey Aron", "hello there"); a longer line is something else.
     if (std::count(norm.begin(), norm.end(), ' ') < 3 &&
         (HasAny(norm, { "hi", "hey", "hello", "heya", "hiya", "howdy", "yo", "sup", "hallo", "moin", "hola", "bonjour", "morning" }) ||
          HasAny(norm, { "привет", "прив", "приветик", "здарова", "здорова", "здравствуй", "здравствуйте", "хай", "ку", "салам", "доброе утро",
-                        "добрый вечер", "добрый день", "приветствую" })))
+                        "добрый вечер", "добрый день", "приветствую" }) ||
+         HasAny(norm, { "servus", "tach", "moinsen", "grüß dich", "gruess dich", "guten morgen", "guten abend", "guten tag", "nabend", "hallöchen", "huhu" })))
         return ConvIntent::Greeting;
 
     return ConvIntent::Unknown;
@@ -696,14 +765,197 @@ Pools const& PoolsForRu(ConvIntent intent, int variant)
     return empty;
 }
 
-Pools const& PoolsFor(ConvIntent intent, int variant, bool russian)
+// The same answers for a player who reads German: Gamer-Deutsch in "du"-Form, short the way German chat is ("jo", "passt",
+// "lad mich ein"). {cls}, {doing} and {prof} come in German (ConvReply); {zone}, {quest} and {guild} are the server's names.
+Pools const& PoolsForDe(ConvIntent intent, int variant)
 {
-    return russian ? PoolsForRu(intent, variant) : PoolsForEn(intent, variant);
+    static Pools const how = {
+        { "passt", "geht so", "lebe noch", "muss ja" },
+        { "gut, und dir?", "läuft", "nicht schlecht, {doing}", "alles gut, {doing}", "kann nicht klagen" },
+        { "richtig gut, danke der Nachfrage! und dir?", "gut, {doing}. und bei dir?", "bestens, danke :)" } };
+    static Pools const from = {
+        { "von hier", "{zone}", "keine ahnung, grad {zone}" },
+        { "grad {zone}", "aus der Gegend, jetzt {zone}", "war schon überall, gerade {zone}" },
+        { "einfach ein {cls} von hier, bin gerade in {zone}", "von überall und nirgends, gerade {zone}, und du?", "ich reise viel, gerade bin ich in {zone} :)" } };
+    static Pools const where = {
+        { "{zone}", "grad {zone}", "in {zone}" },
+        { "bin in {zone}", "grad in {zone}", "drüben in {zone}", "gerade in {zone}" },
+        { "bin drüben in {zone} :)", "gerade in {zone}, komm vorbei!", "du findest mich in {zone}" } };
+    static Pools const level = {
+        { "{lvl}", "{lvl} {cls}", "Level {lvl}" },
+        { "Level {lvl} {cls}", "bin {lvl}, {cls}", "{lvl} {cls}, und du?", "lvl {lvl}" },
+        { "ich bin Level {lvl}, {cls} :)", "Level {lvl} {cls}, und du?", "{lvl} {cls}, levele noch" } };
+    static Pools const cls = {
+        { "{cls}", "{cls}, wieso?", "{cls} halt" },
+        { "bin {cls}", "{cls}, Level {lvl}", "{lvl} {cls}", "spiele {cls}" },
+        { "ich bin {cls} :) Level {lvl}", "{cls}, macht richtig Laune!", "{cls}, und ich liebe es" } };
+    static Pools const doing = {
+        { "{doing}", "nix Besonderes", "{doing}, wieso" },
+        { "{doing}", "nicht viel, {doing}", "{doing} in {zone}", "{doing}, und du?" },
+        { "{doing} in {zone}, und du?", "{doing}, macht Spaß :)", "{doing}, und was treibst du so?" } };
+    static Pools const group_free = {
+        { "ok inv", "klar", "inv" },
+        { "klar, lad mich ein", "gerne! inv mich", "klingt gut, lad mich ein", "jo, warum nicht, inv" },
+        { "klar, schick mir ne Einladung :)", "klingt lustig, lad mich ein und ich komm", "gern, schick einfach die Einladung" } };
+    static Pools const group_busy = {
+        { "in Gruppe", "busy", "geht nicht" },
+        { "bin schon in einer Gruppe, sorry", "bin gerade mit ner Gruppe unterwegs", "grad in Gruppe" },
+        { "bin schon in einer Gruppe, sorry! vielleicht später :)", "bin gerade mit ner Gruppe unterwegs, frag gleich nochmal?" } };
+    static Pools const group_too_high = {
+        { "zu low für dich", "du bist viel höher", "nee, Levelunterschied" },
+        { "du bist ein bisschen zu hoch für mich, sorry", "ich würd dich nur bremsen, du bist viel höher", "sorry, unsere Level sind zu weit auseinander" },
+        { "sorry, du bist ein ganzes Stück höher, ich würd dich nur aufhalten :)", "du bist mir weit voraus, ich würd nur bremsen, sorry!" } };
+    static Pools const group_not_now = {
+        { "jetzt nicht", "grad nicht", "später" },
+        { "gerade nicht, sorry", "geht grad nicht, bin mitten in was", "vielleicht gleich, jetzt nicht" },
+        { "gerade nicht, sorry, vielleicht etwas später? :)", "geht grad nicht, frag in ein paar Minuten nochmal?" } };
+    static Pools const quest_have = {
+        { "{quest}", "an {quest}", "mach {quest}" },
+        { "bin selbst an {quest}", "mach grad {quest}, was brauchst du?", "{quest}, und du?" },
+        { "ich bin selbst an {quest}, helf gern, wenn du sagst, wo du bist :)", "bin gerade an {quest}, sag, wo du festhängst" } };
+    static Pools const quest_none = {
+        { "welche quest", "was für ne quest", "name?" },
+        { "welche Quest?", "was für eine Quest?", "wie heißt die Quest?" },
+        { "klar, welche Quest ist es?", "helf gern, wie heißt die Quest?", "wo hängst du fest? sag mir, wo du bist :)" } };
+    static Pools const trade_have = {
+        { "{prof}", "hab {prof}", "{prof}, wieso" },
+        { "hab {prof}", "{prof} hier, was brauchst du?", "mach {prof}, was suchst du?" },
+        { "ich hab {prof}, was brauchst du?", "{prof} kann ich, helf gern, wenn's geht :)", "{prof}, sag, was du suchst!" } };
+    static Pools const trade_none = {
+        { "nö", "nix", "nee" },
+        { "noch keine Berufe", "nicht wirklich, levele noch", "noch nix" },
+        { "noch keine Berufe, sorry! levele noch :)", "hab noch keine gelernt, vielleicht später!" } };
+    static Pools const guild_have = {
+        { "{guild}", "in {guild}", "<{guild}>" },
+        { "bin in {guild}", "{guild}, und du?", "bin in <{guild}>" },
+        { "ich bin in <{guild}>, coole Truppe :)", "<{guild}>, suchst du eine?" } };
+    static Pools const guild_none = {
+        { "nö", "nee", "keine" },
+        { "keine Gilde", "gerade in keiner", "gildenlos" },
+        { "gerade keine Gilde, rekrutiert ihr? :)", "noch in keiner Gilde, kennst du eine gute?" } };
+    static Pools const name = {
+        { "{self}", "{self}", "{self} halt" },
+        { "bin {self}", "{self}, und du?", "ich heiß {self}" },
+        { "ich bin {self}, freut mich :)", "{self}, und wer bist du?", "nenn mich {self}" } };
+    static Pools const insult = {
+        { "jaja", "ok", "k" },
+        { "na dann", "nicht nett", "okay", "wow ok" },
+        { "das war nicht sehr nett", "muss doch nicht sein", "okay... ich lass das mal so stehen :)" } };
+    static Pools const compliment = {
+        { "ok", "danke", "jo" },
+        { "danke!", "dnk", "danke, du auch", "weiß ich zu schätzen" },
+        { "ach danke :)", "danke, das ist lieb!", "danke, du bist selbst ziemlich klasse :)" } };
+    static Pools const bye = {
+        { "tschüss", "ciao", "bis dann" },
+        { "bis dann", "tschüss!", "man sieht sich", "bis später" },
+        { "tschüss, mach's gut :)", "man sieht sich!", "schönen Abend noch, tschüss!" } };
+    static Pools const greet_known = {
+        { "jo", "hey", "na {sender}" },
+        { "hey {sender}", "moin {sender}!", "hey, was gibt's?", "hallo {sender}" },
+        { "hi {sender}! schön dich zu sehen :)", "hey {sender}, bereit, wenn du's bist", "hallo {sender}, was kann ich tun?" } };
+    static Pools const dir_here = {
+        { "hier ist es", "du bist da", "hier" },
+        { "da bin ich gerade", "du bist schon nah dran, ich bin auch hier" },
+        { "da bin ich gerade :)", "du bist fast da, ich bin im selben Gebiet" } };
+    static Pools const dir = {
+        { "{route}", "{dest}: {route}" },
+        { "{dest}? {route}", "{route}", "nach {dest}: {route}" },
+        { "nach {dest}: {route}", "{dest}? {route} :)", "{dest}: {route}. Drück M für die Karte, falls du dich verläufst" } };
+    static Pools const duel_yes = {
+        { "klar", "ok, schick", "komm her" },
+        { "klar, schick rüber", "ok, du bist dran", "na gut, schick das Duell", "klar, warum nicht" },
+        { "klar, schick rüber :)", "gern, schick das Duell", "ok, viel Glück!" } };
+    static Pools const duel_not_now = {
+        { "nö", "jetzt nicht", "busy" },
+        { "gerade nicht", "vielleicht später", "geht grad nicht, sorry" },
+        { "sorry, gerade nicht, vielleicht später :)", "geht im Moment nicht, frag gleich nochmal?" } };
+    static Pools const duel_too_far = {
+        { "nee, unfair", "lol nö", "kein fairer Kampf" },
+        { "unsere Level liegen zu weit auseinander", "kein fairer Kampf, sorry", "ha, nee, die Level sind zu weit weg" },
+        { "sorry, für ein faires Duell liegen unsere Level zu weit auseinander", "das wär kein fairer Kampf, vielleicht wenn wir näher dran sind :)" } };
+    static Pools const duel_not_here = {
+        { "nicht hier", "geht hier nicht" },
+        { "hier kann man nicht duellieren", "nicht hier drin, sorry" },
+        { "sorry, hier drin können wir nicht duellieren :)" } };
+    static Pools const want_trade = {
+        { "was", "wofür", "was hast du" },
+        { "was suchst du?", "kommt drauf an, was brauchst du?", "klar, was brauchst du?", "woran denkst du?" },
+        { "klar, was suchst du?", "gern, was brauchst du?", "woran hast du gedacht? :)" } };
+    static Pools const thanks = {
+        { "np", "jo", "k" },
+        { "np", "kein Ding", "jederzeit", "gern geschehen" },
+        { "überhaupt kein Problem :)", "jederzeit!", "gern geschehen, viel Spaß" } };
+    static Pools const not_a_bot = {
+        { "lol nö", "nö?", "klinge ich wie einer", "selber" },
+        { "lol nö, spiel nur", "nö, wieso?", "haha nein", "nee, tipp nur langsam" },
+        { "haha nein, ganz normaler Spieler :)", "nö! genieß einfach das Spiel", "nein, nur ich an meiner Tastatur :)" } };
+    static Pools const like_it = {
+        { "geht so", "jo", "klar" },
+        { "jo, macht Spaß", "lieb ich", "ganz gut, hab Spaß", "jo, spiel echt viel" },
+        { "ja, macht mir richtig Spaß :)", "lieb ich, fühlt sich an wie früher", "macht richtig Laune, und dir?" } };
+    static Pools const help = {
+        { "wobei", "was", "was denn" },
+        { "wobei?", "klar, was brauchst du?", "was gibt's?", "vielleicht, worum geht's?" },
+        { "klar, was brauchst du? :)", "helf gern, wenn ich kann, was gibt's?", "was kann ich für dich tun?" } };
+
+    switch (intent)
+    {
+        case ConvIntent::Duel:
+            return variant == int(DuelAnswer::Yes) ? duel_yes : variant == int(DuelAnswer::TooFar) ? duel_too_far
+                 : variant == int(DuelAnswer::NotHere) ? duel_not_here : duel_not_now;
+        case ConvIntent::WantTrade: return want_trade;
+        case ConvIntent::Thanks: return thanks;
+        case ConvIntent::AreYouBot: return not_a_bot;
+        case ConvIntent::LikeIt: return like_it;
+        case ConvIntent::Help: return help;
+        case ConvIntent::HowAreYou: return how;
+        case ConvIntent::WhereFrom: return from;
+        case ConvIntent::WhereAreYou: return where;
+        case ConvIntent::Level: return level;
+        case ConvIntent::ClassSpec: return cls;
+        case ConvIntent::WhatDoing: return doing;
+        case ConvIntent::GroupInvite:
+            return variant == int(GroupAnswer::InGroup) ? group_busy : variant == int(GroupAnswer::TooHigh) ? group_too_high
+                 : variant == int(GroupAnswer::NotNow) ? group_not_now : group_free;
+        case ConvIntent::QuestHelp: return variant ? quest_none : quest_have;
+        case ConvIntent::Trade: return variant ? trade_none : trade_have;
+        case ConvIntent::Guild: return variant ? guild_none : guild_have;
+        case ConvIntent::Name: return name;
+        case ConvIntent::Insult: return insult;
+        case ConvIntent::Compliment: return compliment;
+        case ConvIntent::Goodbye: return bye;
+        case ConvIntent::Greeting: return greet_known;
+        case ConvIntent::Directions: return variant ? dir_here : dir;
+        default: break;
+    }
+    static Pools const empty;
+    return empty;
+}
+
+// The language the answer is written in: Russian and German have their own pools; any other reader gets the English answer,
+// which the send point translates with that reader's catalog.
+enum class ConvLang : uint8_t { En, Ru, De };
+
+ConvLang LangOf(ConversationContext const& ctx)
+{
+    if (ctx.russian) return ConvLang::Ru;
+    if (ctx.lang == uint8_t(Locale::Lang::De)) return ConvLang::De;
+    return ConvLang::En;
+}
+
+Pools const& PoolsFor(ConvIntent intent, int variant, ConvLang lang)
+{
+    switch (lang)
+    {
+        case ConvLang::Ru: return PoolsForRu(intent, variant);
+        case ConvLang::De: return PoolsForDe(intent, variant);
+        default:           return PoolsForEn(intent, variant);
+    }
 }
 
 // A question the rules did not understand, asked of this bot by name or in a whisper, with no AI to answer it: ask back, the way
 // a player does, instead of the old build's "dunno" / "how should i know" (GitHub #12: every whisper got those).
-Pools const& AskBackPools(bool russian)
+Pools const& AskBackPools(ConvLang lang)
 {
     static Pools const en = {
         { "what?", "huh", "say what" },
@@ -713,7 +965,11 @@ Pools const& AskBackPools(bool russian)
         { "чего?", "а?", "в смысле" },
         { "в смысле?", "не понимаю, о чем ты", "а можно еще раз?", "хм, что ты имеешь в виду?" },
         { "извини, а что ты имеешь в виду?", "не совсем понимаю, скажи по-другому?", "хм? расскажи подробнее" } };
-    return russian ? ru : en;
+    static Pools const de = {
+        { "hä?", "was?", "hm?" },
+        { "wie meinst du das?", "hm, versteh nicht ganz, was du meinst", "nochmal bitte?", "hä? was meinst du" },
+        { "sorry, wie meinst du das?", "komm nicht ganz mit, kannst du's anders sagen?", "hm? erzähl mal genauer" } };
+    return lang == ConvLang::Ru ? ru : lang == ConvLang::De ? de : en;
 }
 
 // Light Warcraft humour, kept inoffensive. Tone-independent.
@@ -727,6 +983,24 @@ std::vector<std::string> const& JokesRu()
         "разбойник без незаметности это просто воин",
         "у меня с камнем возвращения много общего, мы оба вечно на перезарядке",
         "лекари не умирают от скуки, только от того, кто спулил следующую пачку",
+    };
+    return j;
+}
+
+// German Warcraft humour: wordplay and the jokes German guild chats tell, inoffensive.
+std::vector<std::string> const& JokesDe()
+{
+    static std::vector<std::string> const j = {
+        "warum geht der murloc über die straße? mrglglgl",
+        "wie viele paladine braucht man für eine glühbirne? keinen, die bubblen und porten nach hause",
+        "geht ein krieger in eine taverne. spottet alle an. fliegt raus",
+        "hab einen magier um was zu trinken gebeten. jetzt hab ich einen berg wasser",
+        "was ist ein schurke ohne verstohlenheit? ein krieger",
+        "mein ruhestein und ich haben viel gemeinsam, wir sind beide ständig auf abklingzeit",
+        "treffen sich zwei jäger. sagt der eine: dein pet hat die gruppe gepullt. sagt der andere: welches pet",
+        "heiler sterben nicht an langeweile, nur an dem, der die nächste gruppe pullt",
+        "was sagt ein gnom im raid? kann mal wer den boss tiefer hängen",
+        "warum tragen zwerge bärte? weil der helm allein so traurig aussieht",
     };
     return j;
 }
@@ -747,11 +1021,32 @@ std::vector<std::string> const& Jokes()
     return j;
 }
 
-std::vector<std::string> const& FollowUps(bool russian)
+std::vector<std::string> const& FollowUps(ConvLang lang)
 {
     static std::vector<std::string> const f = { "you?", "and you?", "what about you?", "how about yourself?" };
     static std::vector<std::string> const ru = { "а ты?", "а у тебя?", "а сам?", "а ты как?" };
-    return russian ? ru : f;
+    static std::vector<std::string> const de = { "und du?", "und bei dir?", "und selbst?", "und wie läuft's bei dir?" };
+    return lang == ConvLang::Ru ? ru : lang == ConvLang::De ? de : f;
+}
+
+// The German words for what ConversationContext carries in English (class, activity and profession words); {doing} becomes a
+// whole phrase ("bin am Questen") so the pools can put it after a comma.
+std::string ToGerman(std::string const& en)
+{
+    static constexpr std::pair<char const*, char const*> kWords[] = {
+        { "warrior", "Krieger" }, { "paladin", "Paladin" }, { "hunter", "Jäger" }, { "rogue", "Schurke" }, { "priest", "Priester" },
+        { "death knight", "Todesritter" }, { "shaman", "Schamane" }, { "mage", "Magier" }, { "warlock", "Hexenmeister" }, { "monk", "Mönch" },
+        { "druid", "Druide" }, { "demon hunter", "Dämonenjäger" }, { "evoker", "Rufer" }, { "adventurer", "Abenteurer" },
+        { "out questing", "bin am Questen" }, { "running errands in town", "erledige Kram in der Stadt" }, { "just wandering around", "lauf einfach rum" },
+        { "running with a group", "bin mit ner Gruppe unterwegs" }, { "just hanging around", "häng nur rum" },
+        { "alchemy", "Alchemie" }, { "blacksmithing", "Schmiedekunst" }, { "enchanting", "Verzauberkunst" }, { "engineering", "Ingenieurskunst" },
+        { "herbalism", "Kräuterkunde" }, { "leatherworking", "Lederverarbeitung" }, { "mining", "Bergbau" }, { "skinning", "Kürschnerei" },
+        { "tailoring", "Schneiderei" },
+    };
+    for (auto const& [e, d] : kWords)
+        if (en == e)
+            return d;
+    return en;
 }
 
 // The Russian words for what ConversationContext carries in English (MakeConvContext's class, activity and profession words).
@@ -780,7 +1075,8 @@ bool LooksLikeQuestion(std::string const& message, std::string const& norm)
         return true;
     std::string const first = norm.substr(0, norm.find(' '));
     for (char const* w : { "what", "why", "how", "where", "who", "when", "is", "are", "do", "does", "can", "will", "would", "could",
-                           "что", "чо", "че", "почему", "зачем", "как", "где", "кто", "когда", "куда", "можно", "есть", "ты" })
+                           "что", "чо", "че", "почему", "зачем", "как", "где", "кто", "когда", "куда", "можно", "есть", "ты",
+                           "warum", "wieso", "weshalb", "wie", "wo", "wer", "wann", "kannst", "bist", "hast", "willst", "machst", "gibt" })
         if (first == w)
             return true;
     return false;
@@ -859,7 +1155,7 @@ std::string ApplyStyle(std::string text, ConversationContext const& ctx)
             text += " :)";
         return text;
     }
-    if (!ctx.russian)
+    if (LangOf(ctx) == ConvLang::En)
         text = FixPronoun(text);
     UpperFirst(text);
     if (smiley && text.back() != '?')
@@ -930,7 +1226,18 @@ std::string ConvRepeatReply(ConversationContext const& ctx, uint32_t sel, uint32
         { "...", "что надо", "хватит спамить" },
         { "да тут я, тут", "ты это повторяешь, что нужно?", "никуда не ухожу, спрашивай" },
         { "я рядом, просто скажи что нужно :)", "давай поболтаем, о чем хочешь?" } };
-    Pools const& p = ctx.russian ? (repeat >= 3 ? insistent_ru : again_ru) : repeat >= 3 ? insistent : again;
+    static Pools const again_de = {
+        { "nochmal?", "hab's gehört", "jaja" },
+        { "hast du schon gesagt", "hab's beim ersten Mal gehört", "bin noch da, sonst noch was?", "jo, ich hör zu" },
+        { "hast du schon gesagt :) was liegt dir auf dem Herzen?", "bin noch da! kann ich helfen?", "hab's beim ersten Mal verstanden, danke :)" } };
+    static Pools const insistent_de = {
+        { "...", "was willst du", "hör auf zu spammen" },
+        { "ja ja, bin ja da", "du sagst das ständig, was brauchst du?", "ich lauf nicht weg, frag ruhig" },
+        { "ich bin doch hier, sag einfach, was du brauchst :)", "quatsch gern, worüber willst du reden?" } };
+    ConvLang const lang = LangOf(ctx);
+    Pools const& p = lang == ConvLang::Ru ? (repeat >= 3 ? insistent_ru : again_ru)
+                   : lang == ConvLang::De ? (repeat >= 3 ? insistent_de : again_de)
+                   : repeat >= 3 ? insistent : again;
     std::vector<std::string> const& pool = ctx.tone == ConvTone::Rude ? p.rude : ctx.tone == ConvTone::Polite ? p.polite : p.neutral;
     return ApplyStyle(Pick(pool, Mix(sel, repeat) >> 4, pool.size()), ctx);
 }
@@ -964,7 +1271,7 @@ bool ConvReply(ConversationContext const& ctx, std::string const& norm, std::str
         }
         if (!LooksLikeQuestion(message, norm))
             return false;
-        Pools const& ask = AskBackPools(ctx.russian);
+        Pools const& ask = AskBackPools(LangOf(ctx));
         std::vector<std::string> const& pool = ctx.tone == ConvTone::Rude ? ask.rude : ctx.tone == ConvTone::Polite ? ask.polite : ask.neutral;
         out = ApplyStyle(Pick(pool, Mix(sel, ctx.bot_seed) >> 4, pool.size()), ctx);
         return !out.empty();
@@ -978,9 +1285,10 @@ bool ConvReply(ConversationContext const& ctx, std::string const& norm, std::str
     uint32_t const s = Mix(sel, ctx.bot_seed);
 
     std::string text;
+    ConvLang const lang = LangOf(ctx);
     if (intent == ConvIntent::Joke)
     {
-        std::vector<std::string> const& jokes = ctx.russian ? JokesRu() : Jokes();
+        std::vector<std::string> const& jokes = lang == ConvLang::Ru ? JokesRu() : lang == ConvLang::De ? JokesDe() : Jokes();
         text = jokes[s % jokes.size()];
     }
     else
@@ -1001,7 +1309,7 @@ bool ConvReply(ConversationContext const& ctx, std::string const& norm, std::str
             }
             default: break;
         }
-        Pools const& pools = PoolsFor(intent, variant, ctx.russian);
+        Pools const& pools = PoolsFor(intent, variant, lang);
         std::vector<std::string> const* pool = &pools.neutral;
         if (ctx.tone == ConvTone::Rude && !pools.rude.empty())
             pool = &pools.rude;
@@ -1012,23 +1320,32 @@ bool ConvReply(ConversationContext const& ctx, std::string const& norm, std::str
         size_t const limit = ctx.length == ConvLength::Terse ? (pool->size() + 1) / 2 : pool->size();
         text = Pick(*pool, s >> 4, limit);
 
-        std::string const zone = ctx.zone.empty() ? (ctx.russian ? "тут" : "around here") : ctx.zone;
+        std::string const zone = ctx.zone.empty() ? (lang == ConvLang::Ru ? "тут" : lang == ConvLang::De ? "hier in der Gegend" : "around here")
+                                                  : ctx.zone;
         std::string doing = ctx.activity.empty() ? "just hanging around" : ctx.activity;
         std::string cls = ctx.class_name.empty() ? "adventurer" : ctx.class_name;
         std::vector<std::string> profs = ctx.professions;
-        if (ctx.russian)
+        if (lang == ConvLang::Ru)
         {
             doing = ToRussian(doing);
             cls = ToRussian(cls);
             for (std::string& pr : profs)
                 pr = ToRussian(pr);
         }
+        else if (lang == ConvLang::De)
+        {
+            doing = ToGerman(doing);
+            cls = ToGerman(cls);
+            for (std::string& pr : profs)
+                pr = ToGerman(pr);
+        }
         Replace(text, "{zone}", zone);
         Replace(text, "{doing}", doing);
         Replace(text, "{cls}", cls);
         Replace(text, "{lvl}", std::to_string(ctx.level));
         Replace(text, "{quest}", ctx.quest_title);
-        Replace(text, "{prof}", ctx.russian && profs.size() > 1 ? profs[0] + " и " + profs[1] : JoinProfessions(profs));
+        Replace(text, "{prof}", lang == ConvLang::Ru && profs.size() > 1 ? profs[0] + " и " + profs[1]
+                              : lang == ConvLang::De && profs.size() > 1 ? profs[0] + " und " + profs[1] : JoinProfessions(profs));
         Replace(text, "{guild}", ctx.guild_name);
         Replace(text, "{self}", ctx.self_name);
         Replace(text, "{sender}", ctx.sender_name);
@@ -1036,8 +1353,8 @@ bool ConvReply(ConversationContext const& ctx, std::string const& norm, std::str
         {
             if (Destination const* d = FindDestination(norm))
             {
-                Replace(text, "{dest}", ctx.russian ? d->ru_name : d->name);
-                Replace(text, "{route}", ctx.russian ? d->ru_route : d->route);
+                Replace(text, "{dest}", lang == ConvLang::Ru ? d->ru_name : lang == ConvLang::De ? d->de_name : d->name);
+                Replace(text, "{route}", lang == ConvLang::Ru ? d->ru_route : lang == ConvLang::De ? d->de_route : d->route);
             }
         }
 
@@ -1049,7 +1366,7 @@ bool ConvReply(ConversationContext const& ctx, std::string const& norm, std::str
         {
             while (!text.empty() && (text.back() == '!' || text.back() == '.'))
                 text.pop_back();
-            text += ", " + Pick(FollowUps(ctx.russian), Mix(s, 8), FollowUps(ctx.russian).size());
+            text += ", " + Pick(FollowUps(lang), Mix(s, 8), FollowUps(lang).size());
         }
     }
 

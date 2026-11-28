@@ -64,6 +64,7 @@ bool HasGuildWord(std::vector<std::string> const& words)
 {
     // guild, guilds, guildie, guildy; gild (a common typo); гильдия / гильдию / гильдии, гилд / гилда / гилду, клан / клана;
     // "ги" is how Russian players write guild in chat ("в ги").
+    // German: gilde / gilden / gildeneinladung.
     return AnyPrefix(words, { "guild", "gild", "гильд", "гилд", "клан" }) || AnyExact(words, { "ги" });
 }
 
@@ -82,15 +83,22 @@ bool HasAskWord(std::vector<std::string> const& words, std::string const& norm)
     if (AnyPrefix(words, { "пригла", "инв", "вступ", "прими", "приня", "возьм", "взять", "добав", "кинь", "кину", "пусти", "впусти",
                            "ищу", "пожалуйст" }))
         return true;
-    return AnyExact(words, { "можно", "хочу", "плиз", "пж", "пжл", "пжлст" });
+    if (AnyExact(words, { "можно", "хочу", "плиз", "пж", "пжл", "пжлст" }))
+        return true;
+    // German: einladen / einladung / lad mich ein, aufnehmen, beitreten, bitte, darf ich, kann ich, will, suche, platz.
+    if (AnyPrefix(words, { "einlad", "aufnehm", "beitret", "beitritt" }))
+        return true;
+    return AnyExact(words, { "lad", "bitte", "will", "suche", "platz", "nimmst", "nehmt" }) || HasPhrase(norm, "darf ich") ||
+           HasPhrase(norm, "kann ich");
 }
 
 // About the sender's own guild, or a no.
 bool IsExcluded(std::vector<std::string> const& words, std::string const& norm)
 {
-    if (AnyExact(words, { "my", "our", "mine", "мою", "моя", "моей", "мой", "нашу", "наша", "нашей", "наш", "свою", "своя" }))
+    if (AnyExact(words, { "my", "our", "mine", "мою", "моя", "моей", "мой", "нашу", "наша", "нашей", "наш", "свою", "своя",
+                          "meine", "meiner", "unsere", "unserer" }))
         return true;
-    if (AnyExact(words, { "dont", "not", "never", "nah", "нет", "неа" }))
+    if (AnyExact(words, { "dont", "not", "never", "nah", "нет", "неа", "nicht", "nie", "nee", "nö", "keine", "kein" }))
         return true;
     return HasPhrase(norm, "no thanks") || HasPhrase(norm, "no thx") || HasPhrase(norm, "не хочу") || HasPhrase(norm, "не надо") ||
            HasPhrase(norm, "не нужно") || HasPhrase(norm, "не буду");

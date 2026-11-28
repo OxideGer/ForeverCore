@@ -56,6 +56,20 @@ TEST_CASE("GuildAsk: Russian requests", "[GuildAsk]")
     CHECK(Ask("гинв"));
 }
 
+TEST_CASE("GuildAsk: German requests", "[GuildAsk]")
+{
+    CHECK(Ask("lad mich in die gilde ein"));
+    CHECK(Ask("kannst du mich in die Gilde einladen?"));
+    CHECK(Ask("darf ich in eure gilde?"));
+    CHECK(Ask("nehmt ihr noch leute in die gilde auf?"));
+    CHECK(Ask("suche eine gilde"));
+    CHECK(Ask("gilde inv bitte"));
+    CHECK_FALSE(Ask("bist du in einer gilde?"));
+    CHECK_FALSE(Ask("willst du in meine gilde?"));
+    CHECK_FALSE(Ask("ich will keine gilde"));
+    CHECK_FALSE(Ask("nee danke, keine gilde"));
+}
+
 TEST_CASE("GuildAsk: lines that are not a request to join", "[GuildAsk]")
 {
     CHECK_FALSE(Ask("are you in a guild?"));

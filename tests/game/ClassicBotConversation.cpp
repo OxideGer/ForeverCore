@@ -473,3 +473,56 @@ TEST_CASE("BotConversation: an unknown question asks back instead of \"dunno\"",
     CHECK_FALSE(ConvReply(c, ConvNormalize("the blue thing is nice"), "the blue thing is nice", 3, true, out));
     CHECK_FALSE(ConvReply(c, ConvNormalize("what about the blue thing?"), "what about the blue thing?", 3, false, out));
 }
+
+TEST_CASE("BotConversation: a German player gets German answers", "[botconversation]")
+{
+    ConversationContext c = Ctx();
+    c.lang = 2;   // Locale::Lang::De
+    c.duel = DuelAnswer::Yes;
+    char const* lines[] = { "wie gehts dir?", "was machst du?", "welches level bist du?", "hast du lust auf gruppe?", "duell?",
+                            "danke", "bist du ein bot?", "wo ist die todesminen?", "wie komme ich nach sturmwind?", "gefällt dir wow?",
+                            "wie heißt du?", "erzähl mal einen witz", "tschüss" };
+    ConvIntent const want[] = { ConvIntent::HowAreYou, ConvIntent::WhatDoing, ConvIntent::Level, ConvIntent::GroupInvite, ConvIntent::Duel,
+                                ConvIntent::Thanks, ConvIntent::AreYouBot, ConvIntent::Directions, ConvIntent::Directions, ConvIntent::LikeIt,
+                                ConvIntent::Name, ConvIntent::Joke, ConvIntent::Goodbye };
+    // Words only the English pools use: a German answer has none of them.
+    char const* english[] = { "you", "good", "sure", "level up", "doing", "thanks", "around here", "invite me", "playing" };
+    for (size_t i = 0; i < std::size(lines); ++i)
+    {
+        INFO(lines[i]);
+        CHECK(Cls(lines[i]) == want[i]);
+        for (uint32_t sel = 0; sel < 8; ++sel)
+        {
+            std::string const s = Lower(Say(c, lines[i], sel));
+            INFO(s);
+            CHECK(s.find('{') == std::string::npos);
+            for (char const* w : english)
+                CHECK(s.find(std::string(" ") + w + " ") == std::string::npos);
+        }
+    }
+    // The class, the activity and the place come in German.
+    for (uint32_t sel = 0; sel < 16; ++sel)
+    {
+        std::string const lvl = Say(c, "welches level bist du?", sel);
+        CHECK(lvl.find("mage") == std::string::npos);
+        std::string const way = Say(c, "wie komme ich nach sturmwind?", sel);
+        CHECK(way.find("Elwynn Forest") == std::string::npos);
+    }
+    bool magier = false;
+    for (uint32_t sel = 0; sel < 32; ++sel)
+        magier = magier || Say(c, "welches level bist du?", sel).find("Magier") != std::string::npos ||
+                           Say(c, "welches level bist du?", sel).find("magier") != std::string::npos;
+    CHECK(magier);
+    // A German reader never gets the Russian pools, a Russian reader never the German ones.
+    c.lang = 1;
+    c.russian = true;
+    CHECK(Say(c, "danke").find("danke") == std::string::npos);
+}
+
+TEST_CASE("BotConversation: German words do not change English classification", "[botconversation]")
+{
+    CHECK(Cls("that was fun") == ConvIntent::Unknown);
+    CHECK(Cls("what was that") != ConvIntent::WhatDoing);
+    CHECK(Cls("thanks") == ConvIntent::Thanks);
+    CHECK(Cls("how are you") == ConvIntent::HowAreYou);
+}

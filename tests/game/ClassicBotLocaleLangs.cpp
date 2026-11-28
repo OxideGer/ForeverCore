@@ -23,6 +23,7 @@
 #ifdef TESTS_HAVE_PLAYERBOT_V2
 
 #include "../../src/modules/PlayerbotV2/Util/BotLocaleText.h"
+#include "../../src/modules/PlayerbotV2/Bot/Quest/QuestRefusal.h"
 #include <cctype>
 #include <set>
 #include <string>
@@ -175,7 +176,11 @@ TEST_CASE("BotLocaleLangs: every catalog is well formed", "[BotLocale]")
         for (std::string const& bad : c.Rejected())
             FAIL_CHECK("refused: " << bad);
         CHECK(c.Rejected().empty());
-        CHECK(c.Translations() == Entries(l).size() + ChatterEntries(l).size());
+        // Every entry is taken; a line that is in both tables with the same translation counts once.
+        std::set<std::pair<std::string, std::string>> pairs;
+        for (Catalog::Entry const& e : Entries(l)) pairs.emplace(e.en, e.tr);
+        for (Catalog::Entry const& e : ChatterEntries(l)) pairs.emplace(e.en, e.tr);
+        CHECK(c.Translations() == (l == Lang::Ru ? Entries(l).size() + ChatterEntries(l).size() : pairs.size()));
 
         for (Catalog::Entry const& e : Entries(l))
         {
@@ -285,6 +290,46 @@ TEST_CASE("BotLocaleLangs: money in each client's own letters", "[BotLocale]")
     c.SetMoneyUnits("g", "s", "k");
     CHECK(c.Add("costs {$}", "kostet {}"));
     CHECK(c.Translate("costs 1g 20s 5c") == "kostet 1g 20s 5k");
+}
+
+TEST_CASE("BotLocaleLangs: German replies", "[BotLocale]")
+{
+    // Code lines: captures, nested words (class, spec, role), "Name: rest", money letters.
+    CHECK(Translate(Lang::De, "Rento: following you") == "Rento: folgt dir");
+    CHECK(Translate(Lang::De, "Zelah: attacking Kobold Miner") == "Zelah: greife Kobold Miner an");
+    CHECK(Translate(Lang::De, "Rento: level 20 Mage (Fire), dps - following you") == "Rento: Level 20 Magier (Feuer), DD – folgt dir");
+    CHECK(Translate(Lang::De, "i'll give you 35s 2c for that") == "dafür geb ich dir 35s 2k");
+    CHECK(Translate(Lang::De, "Pull back: pulling Hogger to the rally point.") == "Pull zurück: ziehe Hogger zum Sammelpunkt.");
+    CHECK(Translate(Lang::De, "Tactics for Baron Geddon: boss first.") == "Taktik für Baron Geddon: erst der Boss.");
+    CHECK(Translate(Lang::De, "that was Brok's fault") == "das war Broks Schuld");
+    CHECK(Translate(Lang::De, "Prefer: Blessing of Might, pet off.") == "Vorzug: Segen der Macht, Pet aus.");
+    // Player command words stay as the player types them.
+    CHECK(Translate(Lang::De, "Raveni holds here and pulls nothing until you say 'go'.").find("'go'") != std::string::npos);
+
+    // Every quest refusal has its German line, with the quest in it.
+    for (uint8_t r = uint8_t(Playerbot::QuestRefusal::Other); r <= uint8_t(Playerbot::QuestRefusal::Unfinishable); ++r)
+    {
+        std::string const s = Playerbot::QuestRefusalLine(Playerbot::QuestRefusal(r), "Wolves");
+        INFO(s);
+        CHECK(Knows(Lang::De, s));
+        CHECK(Translate(Lang::De, s).find("Wolves") != std::string::npos);
+    }
+
+    // Stock chatter: the German variants of a database line, placeholders filled.
+    std::set<std::string> hello;
+    for (int i = 0; i < 200; ++i) hello.insert(Translate(Lang::De, "hi Karrz"));
+    CHECK(hello == std::set<std::string>{ "Hi Karrz", "Moin Karrz" });
+    std::set<std::string> loot;
+    for (int i = 0; i < 200; ++i) loot.insert(Translate(Lang::De, "OMG, look at what I just got |cffa335ee|Hitem:19019|h[Thunderfury]|h|r!!!"));
+    CHECK(loot.size() == 2);
+    for (std::string const& l : loot) CHECK(l.find("[Thunderfury]") != std::string::npos);
+
+    // German readers get no English line for the situations the bots talk about most.
+    for (char const* en : { "Hello", "Goodbye!", "OOM", "Heal me!", "ready", "gg", "my bad", "wipe :(", "Ding!" })
+    {
+        INFO(en);
+        CHECK(Knows(Lang::De, en));
+    }
 }
 
 #endif

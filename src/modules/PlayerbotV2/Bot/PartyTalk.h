@@ -110,7 +110,8 @@ enum class ReactKind : uint8_t
 inline bool IsPauseCue(std::string const& norm)
 {
     return ContainsAnyWord(norm, { "wait", "hold", "stop", "regroup", "rg", "fall back", "back up", "get back", "move back",
-                                   "жди", "ждите", "подожди", "подождите", "стоп", "стой", "стойте", "назад" });
+                                   "жди", "ждите", "подожди", "подождите", "стоп", "стой", "стойте", "назад",
+                                   "warte", "wartet", "wart mal", "halt stopp", "stopp", "moment mal", "einen moment" });
 }
 
 inline size_t Words(std::string const& norm)
@@ -126,10 +127,13 @@ inline size_t Words(std::string const& norm)
 
 // "go" as an order: "go", "ok go", "lets go", "go go", "go next", "we go", a line that starts with "go". Not "i have to go" /
 // "gotta go" (the player is leaving) or "where do we go next" (a question): before, both cleared the hold and handed the lead
-// back to the dungeon autopilot. Russian "го" / "погнали" / "вперед" are orders wherever they stand.
+// back to the dungeon autopilot. Russian "го" / "погнали" / "вперед" are orders wherever they stand. German "los" / "weiter" /
+// "auf gehts" are orders in a short line, not in "was ist los" (what's going on).
 inline bool SaysGo(std::string const& norm)
 {
-    if (ContainsAnyWord(norm, { "го", "погнали", "вперед" }))
+    if (ContainsAnyWord(norm, { "го", "погнали", "вперед", "auf gehts", "auf geht's", "los gehts", "los geht's" }))
+        return true;
+    if (ContainsAnyWord(norm, { "los", "weiter" }) && !ContainsAnyWord(norm, { "ist los", "was los" }) && Words(norm) <= 3)
         return true;
     if (!ContainsWord(norm, "go"))
         return false;
@@ -143,7 +147,8 @@ inline bool IsBackCue(std::string const& norm)
 {
     return norm == "back" || norm == "im back" || norm == "i'm back" || norm == "i am back" || norm == "re" || norm == "back now"
         || norm == "back again" || norm == "ok back"
-        || norm == "я тут" || norm == "вернулся" || norm == "вернулась" || norm == "я вернулся" || norm == "я вернулась";
+        || norm == "я тут" || norm == "вернулся" || norm == "вернулась" || norm == "я вернулся" || norm == "я вернулась"
+        || norm == "wieder da" || norm == "bin wieder da" || norm == "bin zurück" || norm == "zurück" || norm == "da";
 }
 
 // Drink cue — healer or caster announces a mana break. Triggers a
@@ -154,14 +159,15 @@ inline bool IsBackCue(std::string const& norm)
 inline bool IsDrinkCue(std::string const& norm)
 {
     return ContainsAnyWord(norm, { "drink", "drinking", "mb", "oom",
-                                   "пью", "попью", "маны" });
+                                   "пью", "попью", "маны",
+                                   "trinke", "trinken", "kein mana", "wenig mana", "mana leer" });
 }
 
 // "go" / "pull" / "pulling" — the inverse cue: clear any pause so a
 // previous "wait" doesn't keep the group frozen indefinitely.
 inline bool IsGoCue(std::string const& norm)
 {
-    return SaysGo(norm) || ContainsAnyWord(norm, { "pull", "pulling", "engage", "пул", "пулю", "пулим" });
+    return SaysGo(norm) || ContainsAnyWord(norm, { "pull", "pulling", "engage", "пул", "пулю", "пулим", "pulle", "pullen", "ich pulle" });
 }
 
 // "inc" / "incoming" — an alert: a short pause, not a hold.
@@ -180,7 +186,8 @@ inline ReactKind ClassifyMessage(std::string const& norm, std::string const& bot
     // DE/FR/ES/RU freely in /p chat.
     const bool has_thanks = ContainsAnyWord(norm, {
         "ty", "thx", "thanks", "thank", "tyvm", "danke", "merci", "gracias",
-        "спасибо", "спс", "пасиб", "пасибо", "спасиб", "благодарю", "сенкс" });
+        "спасибо", "спс", "пасиб", "пасибо", "спасиб", "благодарю", "сенкс",
+        "dankeschön", "danke schön", "dnk", "vielen dank" });
     // "Ding!" / "Ding 47" — bots and players announce a level-up
     // this way. Treat it as a Grats trigger so the rest of the group
     // congratulates on the ding. "Hark!" prefix from Roleplay-verbose
@@ -189,10 +196,12 @@ inline ReactKind ClassifyMessage(std::string const& norm, std::string const& bot
     // says "ап" ("ап 20") for the same thing.
     const bool has_grats = ContainsAnyWord(norm, {
         "gz", "grats", "gratz", "congrats", "congratulations", "ding", "hark",
-        "грац", "гц", "поздравляю", "поздравляем", "ап", "динь" });
+        "грац", "гц", "поздравляю", "поздравляем", "ап", "динь",
+        "glückwunsch", "glückwünsche", "gratuliere", "gw" });
     const bool has_laugh = ContainsAnyWord(norm, {
         "lol", "haha", "lmao", "xd", "rofl",
-        "лол", "хаха", "хахаха", "ахах", "ахаха", "ахахах", "хд", "ржу", "ору" });
+        "лол", "хаха", "хахаха", "ахах", "ахаха", "ахахах", "хд", "ржу", "ору",
+        "hehe", "hihi", "lach" });
     // "gg" / "wp" / "good game" — universal after-kill or end-of-BG line.
     // Folded into Grats reply pool ("gz!"/"nice"/"well done") since the
     // sentiment is the same (acknowledging a finish).
@@ -206,14 +215,15 @@ inline ReactKind ClassifyMessage(std::string const& norm, std::string const& bot
     const bool has_ack =
         IsPauseCue(norm) || IsGoCue(norm) || IsIncCue(norm) || IsBackCue(norm) ||
         ContainsAnyWord(norm, { "afk", "brb", "афк" });
-    const bool has_ready = ContainsAnyWord(norm, { "ready", "rdy", "гтв", "готов", "готова", "готовы" });
+    const bool has_ready = ContainsAnyWord(norm, { "ready", "rdy", "гтв", "готов", "готова", "готовы", "bereit", "startklar" });
     // Greeting tokens — the kind of thing said when a player joins
     // /p or just opens the conversation. EU mix again (German/French/
     // Spanish/Russian hello variants). "yo" / "hey" / "hi" / "sup" are also
     // common in younger-skewed groups.
     const bool has_greeting = ContainsAnyWord(norm, {
         "hi", "hello", "hey", "yo", "sup", "hallo", "bonjour", "hola", "moin",
-        "привет", "прив", "приветик", "хай", "ку", "здарова", "здравствуйте", "салют", "хеллоу" });
+        "привет", "прив", "приветик", "хай", "ку", "здарова", "здравствуйте", "салют", "хеллоу",
+        "servus", "tach", "moinsen", "huhu", "grüß dich", "hallöchen" });
     // Location query — "where are you" / "wo bist du" / "где ты".
     // Triggers a zone-aware reply ("im in {zone}") instead of the generic
     // "?" direct-address response, on the whisper and the party path. It is

@@ -77,6 +77,21 @@ the reader's chat frame
 * **Never translated**: `ASSIGN|` add-on lines (`NeverTranslate`), command words the player types, GM / diagnostic output,
   log lines.
 
+## Dialogue organization
+
+* **Code lines** (`Util/BotLocale<Xx>.cpp`, `Entries`): every line the code builds (replies to orders, raid callouts and banter,
+  quest refusals, status lines, LFG and guild chat, short party answers). Keyed by the English text with its captures.
+* **Stock chatter** (`Util/BotLocale<Xx>Chatter.cpp`, `ChatterEntries`): the 100 text keys of the database (`playerbot_v2_bot_text`)
+  the code actually says: loot, quests, kills, level-ups, LFG / trade / faction posts, random chatter, greetings, the
+  reply pools, taunts, low health / mana, AoE and loot calls, question answers, emote answers. Keyed by the database line; a
+  German line may say it its own way (several variants, a placeholder left out where it reads better), never adds one.
+  The 87 keys the code never says (ike3 leftovers: `quest_status_*`, `cast_spell_command_*`, `use_command_*`, ...) are left out.
+* **Conversation** (`Bot/BotConversation.cpp`): intent classification and answers. English, Russian and German have their own
+  answer pools (`PoolsForEn/Ru/De`), jokes, ask-backs, repeat answers, destination names and routes; the words a player types
+  are recognized in all three.
+* **Player chat words** (`Bot/PartyTalk.h`, `Bot/GuildAskText.cpp`): thanks, grats, laugh, wait / go / back / drink cues,
+  ready, greetings, guild invite asks: English, Russian and German.
+
 ## Fallback behaviour
 
 | Reader | Line in their catalog | Line only in sister catalog | Line nowhere |
@@ -174,9 +189,14 @@ for both genders, each list in its script). They build with
 
 ## Status
 
-This document grows with the stages listed in the audit (dialogue, remaining lines, add-on). Stage 1 (architecture) and
-stage 2 (name lists) are in place. The text catalogs of the new languages are still empty until the dialogue stage fills
-them, so those readers get English text until then, exactly as an unsupported locale does.
+| Language | Names | Code lines | Stock chatter | Conversation pools | Player chat words |
+|---|---|---|---|---|---|
+| enUS | 250 | source text | source text | own | own |
+| ruRU | 265 | 1,062 | 723 | own | own |
+| deDE | 271 | 1,062 lines (1,079 with variants) | 763 lines (829 with variants) | own (`PoolsForDe`) | party chat, conversation, guild asks |
+| frFR, esES, esMX, ptBR, koKR, zhCN, zhTW | 230–255 each | empty (English) | empty (English) | English, translated per catalog | English and Russian only |
+
+German is complete for every text the bots say. The other languages follow in the same structure.
 
 ## Known limitations
 

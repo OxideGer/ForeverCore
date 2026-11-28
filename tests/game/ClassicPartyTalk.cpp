@@ -76,6 +76,29 @@ TEST_CASE("Party lines in Russian are understood", "[ClassicPartyTalk]")
     CHECK(Kind("Борис, привет", "борис") == ReactKind::Greeting);
 }
 
+TEST_CASE("Party lines in German are understood", "[ClassicPartyTalk]")
+{
+    CHECK(Kind("danke") == ReactKind::Thanks);
+    CHECK(Kind("dankeschön leute") == ReactKind::Thanks);
+    CHECK(Kind("glückwunsch") == ReactKind::Grats);
+    CHECK(Kind("gratuliere zum level") == ReactKind::Grats);
+    CHECK(Kind("hehe") == ReactKind::Laugh);
+    CHECK(Kind("warte mal") == ReactKind::Acknowledge);
+    CHECK(Kind("los") == ReactKind::Acknowledge);
+    CHECK(Kind("auf gehts") == ReactKind::Acknowledge);
+    CHECK(Kind("alle bereit?") == ReactKind::Ready);
+    CHECK(Kind("servus") == ReactKind::Greeting);
+    CHECK(Kind("moin leute") == ReactKind::Greeting);
+    CHECK(Kind("bin wieder da") == ReactKind::Acknowledge);
+    // Ordinary German is not an order.
+    CHECK(Kind("was ist los bei euch") == ReactKind::None);
+    CHECK(Kind("ist halt so") == ReactKind::None);
+    CHECK(Kind("im moment nicht") == ReactKind::None);
+    CHECK(Kind("das wetter ist schön") == ReactKind::None);
+    CHECK(Kind("Aron wo bist du") == ReactKind::LocationQuery);
+    CHECK(Kind("danke Aron") == ReactKind::Thanks);
+}
+
 TEST_CASE("A short line is short in any language", "[ClassicPartyTalk]")
 {
     CHECK(Letters("where is the bank") == 17);
