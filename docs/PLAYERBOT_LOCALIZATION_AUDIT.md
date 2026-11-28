@@ -120,7 +120,7 @@ Coverage per stage is recorded in section 7 as the work lands.
 | Stage | State |
 |---|---|
 | 1 Architecture | done: `Lang` ×10, `LangFromLocale`/`LangCode`/`ParseLang`, per-language catalogs (`Util/BotLocale{De,Fr,EsES,EsMX,PtBR,Ko,ZhCN,ZhTW}.cpp`, empty), variants, esMX↔esES fallback, `Pref` 0–10, `.bot language` all codes, `.playerbot langprobe <locale>`, bridge codes, zone names in the reader's locale, `Playerbot.Localization.DefaultLocale`, tests `tests/game/ClassicBotLocaleLangs.cpp`. See `docs/PLAYERBOT_LOCALIZATION.md`. |
-| 2 Names | pending |
+| 2 Names | done: one list per locale (230–271 names each, 2,461 in all) in `Fleet/Names/BotNames*.cpp`, `Fleet/BotLocaleNames` (rules check), `Fleet/BotLocaleNamePicker` (config `Playerbot.Localization.NameLocale`, live `CheckPlayerName`), drawn before the database pools in `BotComposition::Roll`; tests `tests/game/ClassicBotLocaleNames.cpp`. No schema change, no rename of existing characters. itIT is not a WoW Forever client language (checked against the client language list) and is not added. |
 | 3 Dialogue | pending |
 | 4 Code lines, add-on | pending |
 | 5 Tests, builds | pending |

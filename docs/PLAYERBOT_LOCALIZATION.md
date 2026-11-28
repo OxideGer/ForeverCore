@@ -95,6 +95,57 @@ A missing or malformed catalog entry never breaks a line: malformed entries are 
 |---|---|---|
 | `Playerbot.Language.Enable` | 1 | 0 = every bot line in English. |
 | `Playerbot.Localization.DefaultLocale` | `auto` | Language of lines no single reader decides. `auto` = realm DBCLocale, or a locale code. Unknown values are logged and read as `auto`. |
+| `Playerbot.Localization.NameLocale` | `default` | Name list of new bots: `default`, a locale code, `players` or `off` (see Bot names). |
+
+## Bot names
+
+Every client language has its own list of character names, written for that community (not translated from one list):
+
+| List | File | Names | Style |
+|---|---|---|---|
+| enUS | `Fleet/Names/BotNamesEn.cpp` | 250 | MMO memes, joined-word usernames, class puns |
+| deDE | `Fleet/Names/BotNamesDe.cpp` | 271 | puns, food and beer, dialect, fairy tales (Haudruff, Bierfürst, Tankwart, Frostbeule) |
+| ruRU | `Fleet/Names/BotNamesRu.cpp` | 265 | Cyrillic; gamer slang and memes, patronymic nicknames, cartoons, folk tales (Нагибатор, Палыч, Пивозавр) |
+| frFR | `Fleet/Names/BotNamesFr.cpp` | 255 | race/class puns, French internet slang, cheese, literature (Paladingue, Nainternet, Kikoolol) |
+| esES | `Fleet/Names/BotNamesEsES.cpp` | 240 | Spanish gamer slang, cuñado humour, tapas, Golden Age literature (Manco, Cuñao, Croqueta) |
+| esMX | `Fleet/Names/BotNamesEsMX.cpp` | 230 | Mexican slang, taquería, lucha libre, Día de Muertos, folklore (Chido, Taquero, Ajolote) |
+| ptBR | `Fleet/Names/BotNamesPtBR.cpp` | 235 | Brazilian memes and regional words, boteco food, folklore (Sextou, Coxinha, Saci) |
+| koKR | `Fleet/Names/BotNamesKo.cpp` | 245 | Hangul; game slang and memes, food, folk tales (만렙, 치느님, 가즈아) |
+| zhCN | `Fleet/Names/BotNamesZhCN.cpp` | 240 | Simplified; WoW CN slang, memes, food, classic novels (奶妈, 摸鱼达人, 法爷) |
+| zhTW | `Fleet/Names/BotNamesZhTW.cpp` | 230 | Traditional; Taiwanese slang, PTT memes, night market, folklore (雷包, 半糖少冰, 虎姑婆) |
+
+**Which list** a new bot takes its name from: `Playerbot.Localization.NameLocale`.
+
+| Value | Names of new bots |
+|---|---|
+| `default` (default) | the language of `Playerbot.Localization.DefaultLocale` (`auto` there = the realm's DBCLocale) |
+| `deDE`, `frFR`, … | that list only: `deDE` gives German names only |
+| `players` | the client languages of the real players seen since the start, weighted by how many read each one |
+| `off` | no list: the database name pools as before this change |
+
+**Rules** (checked by `LocaleNames::FitsCoreRules` and the unit test, and again by the core's `ObjectMgr::CheckPlayerName` before
+a name is taken): at most 12 letters, one script, no digits, blanks or signs, no letter three times in a row, written in the
+form the core stores (`Haudruff`, not `HauDruff`: the core lower-cases everything after the first letter). Korean and Chinese
+names need a realm that allows Hangul / Hanzi (`StrictPlayerNames = 0`, the default); a stricter realm rejects them at the
+core's check and the bot gets a database-pool name instead.
+
+**Gender**: each name is tagged male, female or either; a bot only gets a name that fits its gender.
+
+**Used-up lists**: a list has about 250 names. Once every name of a list is taken (by bots or players), new bots fall back to the
+database pools and the syllable generator, and the log says so once (`[names] the deDE name list has no free name left`).
+Add names to the list to extend it.
+
+**Existing characters are never renamed.** A character name is global and stored in `characters`; only bots created after
+this change take names from the lists. Bots that exist keep their names. There is no automatic rename; a server owner who wants
+older bots renamed can delete those bots with the existing bot commands and let new ones be created (never touches real
+players' characters).
+
+No database change: the lists are source files; the database name pools are not changed.
+
+### Adding names
+
+Add `{ "Name", kMale | kFemale | kAny }` to the language's list in `Fleet/Names/BotNames<Xx>.cpp`, in the stored form. Run the
+unit tests: they reject a name the core would refuse, and a name that is already in the same list.
 
 ## Adding translations
 
@@ -116,17 +167,21 @@ A missing or malformed catalog entry never breaks a line: malformed entries are 
 ## Testing
 
 `tests/game/ClassicBotLocale.cpp` (Russian behaviour, unchanged) and `tests/game/ClassicBotLocaleLangs.cpp` (all locales:
-mapping, words, catalog well-formedness, UTF-8, placeholders, fallback, variants, money). They build with
+mapping, words, catalog well-formedness, UTF-8, placeholders, fallback, variants, money) and
+`tests/game/ClassicBotLocaleNames.cpp` (the core's name rules, every list valid, at least 200 names, no repeats, enough names
+for both genders, each list in its script). They build with
 `-DBUILD_PLAYERBOT_V2=1 -DBUILD_TESTING=1` and run with `tests.exe "[BotLocale]"`.
 
 ## Status
 
-This document grows with the stages listed in the audit (names, dialogue, remaining lines, add-on). Stage 1 (architecture)
-is in place; the catalogs of the new languages are created and empty until the content stages fill them, so those readers
-get English until then, exactly as an unsupported locale does.
+This document grows with the stages listed in the audit (dialogue, remaining lines, add-on). Stage 1 (architecture) and
+stage 2 (name lists) are in place. The text catalogs of the new languages are still empty until the dialogue stage fills
+them, so those readers get English text until then, exactly as an unsupported locale does.
 
 ## Known limitations
 
-* Character and guild names are global: one name per bot for all readers (see the name stage).
+* Character names are global: one name per bot for all readers, chosen by one server-wide setting.
+* Bot guild names (`Fleet/BotGuildNamePool.cpp`) are still English.
+* A name handed out for a creation that then failed stays blocked until the next server start.
 * Korean and Chinese keyword understanding of player chat is limited: the tokenizer splits on spaces.
 * GM and diagnostic commands stay English.

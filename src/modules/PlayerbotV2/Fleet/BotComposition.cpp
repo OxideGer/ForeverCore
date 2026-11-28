@@ -1,6 +1,7 @@
 #include "BotComposition.h"
 
 #include "BotNamePool.h"
+#include "BotLocaleNamePicker.h"
 #include "SkyborneIsle.h"
 #include "../Bot/ClassTables.h"   // IsVanillaRealm
 #include "CharacterCache.h"
@@ -462,11 +463,15 @@ BotComposition::Pick BotComposition::Roll(uint8 race_hint, uint8 cls_hint,
         // ObjectMgr::CheckPlayerName, fixing the create_fail observed
         // 2026-05-15 where 3/3 JIT DPS bots died on
         // CHAR_NAME_THREE_CONSECUTIVE.
+        // The language name list comes first (Playerbot.Localization.NameLocale: deDE gives German names, ...); the
+        // database pools and the syllable generator stay behind it for a list that is off or used up.
         if (!name_hint.empty())
             p.name = std::move(name_hint);
         else
         {
-            p.name = Fleet::BotNamePool::Acquire(p.gender);
+            p.name = Fleet::LocaleNamePicker::Pick(p.gender);
+            if (p.name.empty())
+                p.name = Fleet::BotNamePool::Acquire(p.gender);
             if (p.name.empty())
                 p.name = RollUniqueName();
         }

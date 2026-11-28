@@ -180,6 +180,18 @@ Locale::Lang ServerLang()
     return v < Locale::kLangCount ? Locale::Lang(v) : Locale::Lang::En;
 }
 
+void CountReaderLangs(uint32 (&out)[Locale::kLangCount])
+{
+    for (uint32& n : out) n = 0;
+    std::shared_lock lk(g_mtx);
+    for (auto const& [account, locale] : g_client_locale)
+    {
+        auto pref = g_prefs.find(account);
+        Locale::Lang const lang = pref != g_prefs.end() ? LangOfPref(pref->second) : FromLocale(locale);
+        ++out[size_t(lang)];
+    }
+}
+
 char const* PrefName(Pref pref)
 {
     // "en" and "ru" as before (the add-on and the players' habits read them); the newer languages by their short code.

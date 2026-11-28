@@ -1006,8 +1006,22 @@ Playerbot.AddonHint.Url = "https://github.com/Karrz1/Karrz-playerbots-wow-foreve
 #                             DBCLocale; or one of enUS deDE esES esMX frFR ruRU koKR ptBR zhCN zhTW. An unknown value is logged
 #                             and read as "auto"; it never stops the server.
 #
+#  Playerbot.Localization.NameLocale
+#                             (default "default") The name list new bot characters take their names from. Every client
+#                             language has its own list of names in its players' style (Fleet/Names/BotNames*.cpp):
+#                               "default"  the language of Playerbot.Localization.DefaultLocale
+#                               "players"  the client languages of the real players seen since the start, weighted by how many
+#                                          read each one (a realm of German and French players gets German and French names)
+#                               "off"      no list: the database name pools as before
+#                               enUS deDE esES esMX frFR ruRU koKR ptBR zhCN zhTW   that list only (deDE: German names only)
+#                             A name is used only when it is free and passes the realm's own name check (StrictPlayerNames:
+#                             koKR / zhCN / zhTW names need a realm that allows Hangul / Hanzi, as the default 0 does). A used-up
+#                             list falls back to the database pools. Only new bots are named this way; existing characters keep
+#                             their names. An unknown value is logged and read as "default".
+#
 Playerbot.Language.Enable = 1
 Playerbot.Localization.DefaultLocale = "auto"
+Playerbot.Localization.NameLocale = "default"
 #   SoloFlee          a solo open-world bot (no group, not in an instance or battleground) losing a fight (HP under 30%,
 #                     35% for casters / hunters / rogues, 25% for melee; the mob not nearly dead) uses its escape tools
 #                     (Disengage, Frost Nova + Blink, Fade / Psychic Scream, Death Coil, Vanish / Sprint, Intimidating

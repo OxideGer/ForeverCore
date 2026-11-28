@@ -55,6 +55,10 @@ constexpr bool IsValidPref(uint8 v) { return v <= uint8(Locale::kLangCount); }
 // near, and the default of new bot names): Playerbot.Localization.DefaultLocale, "auto" = the realm's own (DBCLocale).
 Locale::Lang ServerLang();
 
+// How many real players read each language, over the accounts that logged in since the server started (their choice, else the
+// locale their client reported). For Playerbot.Localization.NameLocale = players. Thread-safe.
+void CountReaderLangs(uint32 (&out)[Locale::kLangCount]);
+
 // Reads the config and the stored choices. World thread, at module init.
 void Load();
 
